@@ -4,6 +4,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import threading
 from datetime import datetime
 from functools import partial
@@ -15,7 +16,8 @@ from urllib.parse import urlsplit
 
 APP_NAME = "linqing-minimal-trade-board"
 ROOT_DIR = Path(__file__).resolve().parent
-MAX_BODY_BYTES = 2 * 1024 * 1024
+MAX_BODY_BYTES = 12 * 1024 * 1024
+MODULE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
 def resolve_state_file() -> Path:
@@ -43,7 +45,48 @@ def default_store() -> dict[str, Any]:
         "revision": 0,
         "savedAt": None,
         "state": None,
+        "modules": {},
     }
+
+
+def default_module_store() -> dict[str, Any]:
+    return {
+        "revision": 0,
+        "savedAt": None,
+        "state": {},
+    }
+
+
+def sanitize_module_store(raw: Any) -> dict[str, Any]:
+    data = raw if isinstance(raw, dict) else {}
+    revision = data.get("revision")
+
+    try:
+        revision_number = max(0, int(revision))
+    except (TypeError, ValueError):
+        revision_number = 0
+
+    saved_at = data.get("savedAt")
+    state = data.get("state") if isinstance(data.get("state"), dict) else {}
+
+    return {
+        "revision": revision_number,
+        "savedAt": str(saved_at) if saved_at else None,
+        "state": state,
+    }
+
+
+def sanitize_modules(raw: Any) -> dict[str, dict[str, Any]]:
+    if not isinstance(raw, dict):
+        return {}
+
+    modules: dict[str, dict[str, Any]] = {}
+    for raw_module_id, raw_module in raw.items():
+        module_id = str(raw_module_id or "").strip()
+        if MODULE_ID_PATTERN.fullmatch(module_id):
+            modules[module_id] = sanitize_module_store(raw_module)
+
+    return modules
 
 
 def sanitize_store(raw: Any) -> dict[str, Any]:
@@ -63,6 +106,7 @@ def sanitize_store(raw: Any) -> dict[str, Any]:
         "revision": revision_number,
         "savedAt": str(saved_at) if saved_at else None,
         "state": state,
+        "modules": sanitize_modules(data.get("modules")),
     }
 
 
@@ -92,6 +136,28 @@ def base_state() -> dict[str, Any]:
         "accounts": [],
         "holdings": [],
         "plans": [],
+    }
+
+
+def extract_module_id(path: str) -> str | None:
+    prefix = "/api/modules/"
+    if not path.startswith(prefix):
+        return None
+
+    module_id = path[len(prefix) :].strip("/")
+    if not MODULE_ID_PATTERN.fullmatch(module_id):
+        raise ValueError("Invalid module id.")
+
+    return module_id
+
+
+def module_response_payload(module_id: str, raw_module: Any) -> dict[str, Any]:
+    module_store = sanitize_module_store(raw_module)
+    return {
+        "moduleId": module_id,
+        "revision": module_store["revision"],
+        "savedAt": module_store["savedAt"],
+        "state": module_store["state"],
     }
 
 
@@ -220,6 +286,14 @@ class BoardRequestHandler(SimpleHTTPRequestHandler):
         if path == "/api/state":
             self.handle_get_state()
             return
+        try:
+            module_id = extract_module_id(path)
+        except ValueError as error:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+            return
+        if module_id:
+            self.handle_get_module_state(module_id)
+            return
 
         super().do_GET()
 
@@ -233,6 +307,14 @@ class BoardRequestHandler(SimpleHTTPRequestHandler):
             return
         if path == "/api/state":
             self.handle_replace_state()
+            return
+        try:
+            module_id = extract_module_id(path)
+        except ValueError as error:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+            return
+        if module_id:
+            self.handle_replace_module_state(module_id)
             return
 
         self.send_error(HTTPStatus.NOT_FOUND)
@@ -323,6 +405,11 @@ class BoardRequestHandler(SimpleHTTPRequestHandler):
         store = self.load_store()
         self.send_json(HTTPStatus.OK, store)
 
+    def handle_get_module_state(self, module_id: str) -> None:
+        store = self.load_store()
+        modules = store.get("modules") if isinstance(store.get("modules"), dict) else {}
+        self.send_json(HTTPStatus.OK, module_response_payload(module_id, modules.get(module_id)))
+
     def handle_get_health(self) -> None:
         store = self.load_store()
         self.send_json(
@@ -376,6 +463,49 @@ class BoardRequestHandler(SimpleHTTPRequestHandler):
             return
 
         self.send_json(HTTPStatus.OK, next_store)
+
+    def handle_replace_module_state(self, module_id: str) -> None:
+        try:
+            payload = self.read_json_body()
+            next_state = payload.get("state")
+            if not isinstance(next_state, dict):
+                raise ValueError("state must be a JSON object.")
+
+            store_lock: threading.Lock = getattr(self.server, "store_lock")
+            state_path: Path = getattr(self.server, "state_path")
+
+            with store_lock:
+                current_store = load_store(state_path)
+                modules = sanitize_modules(current_store.get("modules"))
+                current_module = modules.get(module_id, default_module_store())
+                saved_at = now_text()
+
+                modules[module_id] = sanitize_module_store(
+                    {
+                        "revision": int(current_module.get("revision") or 0) + 1,
+                        "savedAt": saved_at,
+                        "state": next_state,
+                    }
+                )
+
+                next_store = sanitize_store(
+                    {
+                        "app": APP_NAME,
+                        "revision": int(current_store.get("revision") or 0) + 1,
+                        "savedAt": saved_at,
+                        "state": current_store.get("state"),
+                        "modules": modules,
+                    }
+                )
+                write_store(state_path, next_store)
+        except ValueError as error:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+            return
+
+        self.send_json(
+            HTTPStatus.OK,
+            module_response_payload(module_id, next_store["modules"].get(module_id)),
+        )
 
 
 def build_expected_auth_header() -> str | None:

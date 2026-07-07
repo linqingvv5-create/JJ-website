@@ -170,6 +170,15 @@ textarea {
   transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
+a.back-button,
+a.primary-button,
+a.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .back-button,
 .secondary-button,
 .plan-action-button,

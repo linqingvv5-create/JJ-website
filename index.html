@@ -1,44 +1,1188 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>林青交易看板</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>JJ 健身打卡</title>
+<style>
+:root{--bg:#0d0d14;--card:#181824;--accent:#e8745c;--ac2:#5cc9e8;--ac3:#f0b050;--ac4:#6ce0a0;--txt:#e6e6ed;--mt:#8a8a96;--done:#3ecf8e;--warn:#f5a623;--bd:#2a2a38;--peri:#e87ca0;--r:14px;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,'PingFang SC','Noto Sans SC',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;padding-bottom:80px;-webkit-tap-highlight-color:transparent;}
+.hide{display:none!important;}
+
+/* ── HOME ── */
+.home-header{text-align:center;padding:32px 16px 10px;}
+.home-header .greet{font-size:26px;font-weight:700;}
+.home-header .date{font-size:13px;color:var(--mt);margin-top:4px;}
+.home-header .quote{font-size:12px;color:var(--mt);margin-top:6px;font-style:italic;}
+
+.wake-btn{display:block;width:80%;max-width:280px;margin:14px auto 24px;padding:16px;border-radius:50px;border:none;background:linear-gradient(135deg,#f0b050,#e8745c);color:#fff;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(232,116,92,.3);transition:all .2s;}
+.wake-btn:active{transform:scale(.95);opacity:.9;}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px;}
+.mod-card{border-radius:var(--r);padding:22px 18px;color:#fff;cursor:pointer;transition:all .15s;min-height:110px;position:relative;overflow:hidden;}
+.mod-card:active{transform:scale(.97);}
+.mod-card .icon{font-size:32px;display:block;margin-bottom:8px;}
+.mod-card .title{font-size:17px;font-weight:700;}
+.mod-card .sub{font-size:12px;opacity:.75;margin-top:4px;}
+.c1{background:linear-gradient(135deg,#2a1a20,#1a1418);border:1px solid rgba(232,116,92,.3);}
+.c2{background:linear-gradient(135deg,#1a2428,#141a1e);border:1px solid rgba(92,201,232,.3);}
+.c3{background:linear-gradient(135deg,#241e18,#1a1a14);border:1px solid rgba(240,176,80,.3);}
+.c4{background:linear-gradient(135deg,#18241a,#141a14);border:1px solid rgba(108,224,160,.3);}
+.c5{background:linear-gradient(135deg,#1e1a24,#18141a);border:1px solid rgba(180,140,220,.3);}
+.c6{background:linear-gradient(135deg,#1a1a24,#141420);border:1px solid rgba(140,160,200,.3);}
+
+/* ── 通用页面 ── */
+.page{padding:0 16px;}
+.page h1{font-size:22px;text-align:center;padding:20px 0 14px;}
+.back-btn{background:none;border:none;color:var(--mt);font-size:16px;cursor:pointer;padding:16px 0 0 16px;display:block;}
+
+/* ── 拍照小按钮条 ── */
+.camera-strip{display:flex;gap:8px;padding:8px 16px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;justify-content:center;}
+.camera-strip::-webkit-scrollbar{display:none;}
+.cam-btn{flex-shrink:0;padding:8px 14px;border-radius:20px;background:var(--card);border:1px solid var(--bd);color:var(--txt);font-size:12px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;transition:all .15s;}
+.cam-btn:active{transform:scale(.95);background:var(--bd);}
+
+/* ── 进度卡片 ── */
+.progress-card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin:0 16px 16px;}
+.day-btn{background:linear-gradient(135deg,#2a1a20,#1a1418);border:1px solid rgba(232,116,92,.3);border-radius:var(--r);padding:16px;color:var(--txt);cursor:pointer;font-size:14px;font-weight:600;transition:all .15s;}
+.day-btn:active{transform:scale(.97);opacity:.9;}
+.func-btn{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:16px;color:var(--txt);cursor:pointer;font-size:14px;font-weight:600;transition:all .15s;text-align:left;display:flex;align-items:center;gap:8px;}
+.func-btn:active{transform:scale(.97);}
+
+/* ── 训练区块 ── */
+.section{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:10px;}
+.section .sec-head{display:flex;align-items:center;justify-content:space-between;}
+.section .sec-title{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px;}
+.section .sec-time{font-size:12px;color:var(--mt);}
+.ex-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;border-radius:6px;margin:0 -6px;padding-left:6px;padding-right:6px;}
+.ex-row:last-child{border-bottom:none;}
+.ex-row:active{background:rgba(255,255,255,.03);}
+.ex-row .check{width:22px;height:22px;border-radius:50%;border:2px solid var(--bd);flex-shrink:0;font-size:11px;display:flex;align-items:center;justify-content:center;}
+.ex-row.done .check{background:var(--done);border-color:var(--done);}
+.ex-row .info{flex:1;min-width:0;}
+.ex-row .info .nm{font-size:14px;font-weight:500;}
+.ex-row .info .ds{font-size:11px;color:var(--mt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ex-row .play{color:var(--ac2);flex-shrink:0;width:30px;text-align:center;font-size:16px;cursor:pointer;}
+
+/* ── 打卡按钮 ── */
+.checkin-btn{display:block;width:100%;padding:16px;border-radius:var(--r);border:none;font-size:17px;font-weight:700;cursor:pointer;margin:12px 0;transition:all .2s;color:#fff;background:var(--accent);}
+.checkin-btn:active{transform:scale(.98);}
+.checkin-btn.checked{background:var(--done);}
+
+/* ── 弹窗 ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:flex-end;justify-content:center;}
+.modal{background:var(--card);border-radius:var(--r) var(--r) 0 0;width:100%;max-width:520px;padding:20px;max-height:85vh;overflow-y:auto;}
+.modal h3{font-size:17px;margin-bottom:14px;}
+.modal input,.modal select,.modal textarea{width:100%;padding:12px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--txt);font-size:15px;margin-bottom:10px;}
+.modal textarea{resize:vertical;min-height:80px;}
+.modal .btn-row{display:flex;gap:10px;margin-top:12px;}
+.modal .btn-row button{flex:1;padding:12px;border-radius:10px;border:none;font-size:15px;font-weight:600;cursor:pointer;}
+.modal .btn-row .primary{background:var(--accent);color:#fff;}
+.modal .btn-row .secondary{background:var(--bd);color:var(--txt);}
+
+/* ── 经期指示 ── */
+.peri-dot{width:10px;height:10px;border-radius:50%;background:var(--peri);display:inline-block;margin-right:4px;}
+
+/* ── 底部导航 ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--bd);display:flex;z-index:50;}
+.bottom-nav button{flex:1;padding:10px;background:none;border:none;color:var(--mt);font-size:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.bottom-nav button.active{color:var(--accent);}
+.bottom-nav button .ni{font-size:20px;}
+
+/* ── 记录表格 ── */
+.tbl{width:100%;font-size:12px;border-collapse:collapse;}
+.tbl td,.tbl th{padding:6px 4px;border-bottom:1px solid var(--bd);text-align:center;}
+.tbl th{color:var(--mt);font-weight:500;font-size:10px;}
+
+/* ── 每日详情 ── */
+.day-phase{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:12px;}
+.day-phase-title{font-size:15px;font-weight:600;margin-bottom:10px;color:var(--accent);}
+.day-move{display:flex;align-items:center;gap:10px;padding:10px;border-radius:6px;margin-bottom:6px;cursor:pointer;background:rgba(255,255,255,.03);}
+.day-move .checkbox{width:22px;height:22px;border:2px solid var(--bd);border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;}
+.day-move.done .checkbox{background:var(--done);border-color:var(--done);}
+.day-move .move-info{flex:1;min-width:0;}
+.day-move .move-name{font-size:14px;font-weight:500;}
+.day-move .move-desc{font-size:11px;color:var(--mt);margin-top:2px;}
+
+/* ── 体态问题 ── */
+.issue-card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:12px;}
+.issue-card .issue-title{font-size:16px;font-weight:600;color:var(--accent);margin-bottom:8px;}
+.issue-card .issue-solution{font-size:13px;color:var(--txt);line-height:1.6;}
+
+/* ── 分段标签 ── */
+.sec-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}
+.sec-tag.warmup{background:rgba(240,176,80,.2);color:var(--ac3);}
+.sec-tag.main{background:rgba(232,116,92,.2);color:var(--accent);}
+.sec-tag.supplement{background:rgba(180,140,220,.2);color:#b48cdc;}
+.sec-tag.golden{background:rgba(240,176,80,.25);color:#f0b050;}
+.sec-tag.walk{background:rgba(108,224,160,.2);color:var(--ac4);}
+.sec-tag.evening{background:rgba(92,201,232,.2);color:var(--ac2);}
+
+/* ── 动作解读表 ── */
+.guide-table{width:100%;font-size:13px;border-collapse:collapse;margin-top:8px;}
+.guide-table td,.guide-table th{padding:10px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top;}
+.guide-table th{color:var(--accent);font-weight:600;font-size:11px;white-space:nowrap;}
+.guide-table .note-cell{color:var(--mt);font-size:12px;cursor:pointer;min-width:120px;}
+.guide-table .note-cell:hover{color:var(--txt);}
+.guide-table .note-cell:empty::after{content:'点击添加备注';color:var(--bd);font-size:11px;}
+
+/* ── 围度表格 ── */
+.circ-table{width:100%;font-size:12px;border-collapse:collapse;}
+.circ-table td,.circ-table th{padding:8px 4px;border-bottom:1px solid var(--bd);text-align:center;}
+.circ-table th{color:var(--accent);font-weight:600;font-size:10px;white-space:nowrap;}
+.circ-table .del-btn{background:none;border:none;color:var(--accent);cursor:pointer;font-size:14px;padding:2px 6px;}
+.circ-table tr:first-child td{font-weight:600;color:var(--ac2);}
+
+/* ── 照片系统 ── */
+.photo-group{margin-bottom:20px;}
+.photo-group-title{font-size:15px;font-weight:600;margin-bottom:8px;color:var(--accent);display:flex;align-items:center;gap:6px;}
+.photo-thumb-list{display:flex;flex-wrap:wrap;gap:8px;}
+.photo-thumb{width:80px;height:100px;border-radius:8px;object-fit:cover;cursor:pointer;border:2px solid var(--bd);transition:all .15s;}
+.photo-thumb:active{transform:scale(.95);border-color:var(--accent);}
+.photo-thumb-label{font-size:10px;color:var(--mt);text-align:center;margin-top:2px;width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.photo-empty{font-size:12px;color:var(--mt);padding:20px;text-align:center;}
+
+/* ── 照片全屏预览 ── */
+.photo-fullscreen{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.photo-fullscreen img{max-width:95vw;max-height:70vh;object-fit:contain;border-radius:8px;}
+.photo-fullscreen .close-btn{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:28px;width:40px;height:40px;border-radius:50%;cursor:pointer;}
+.photo-fullscreen .info-bar{color:var(--mt);font-size:13px;margin-top:12px;text-align:center;}
+
+/* ── 拍照页 ── */
+.camera-page{position:fixed;inset:0;background:#000;z-index:150;display:flex;flex-direction:column;}
+.camera-page video{flex:1;width:100%;object-fit:cover;}
+.camera-page canvas{display:none;}
+.camera-page .cam-controls{display:flex;gap:12px;padding:16px;justify-content:center;background:rgba(0,0,0,.8);}
+.camera-page .cam-controls button{flex:1;padding:14px;border-radius:12px;border:none;font-size:16px;font-weight:600;cursor:pointer;max-width:160px;}
+.camera-page .cam-shoot{background:var(--accent);color:#fff;}
+.camera-page .cam-cancel{background:rgba(255,255,255,.15);color:#fff;}
+.camera-page .type-badge{position:absolute;top:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);color:#fff;padding:6px 16px;border-radius:20px;font-size:14px;font-weight:600;}
+
+/* ── 拍照参考框 ── */
+.ref-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border:2px dashed rgba(255,255,255,.3);border-radius:4px;pointer-events:none;}
+.ref-overlay .ref-label{position:absolute;bottom:-24px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.5);font-size:10px;white-space:nowrap;}
+.ref-guide{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.4);font-size:10px;text-align:center;line-height:1.6;}
+
+/* ── 统计条 ── */
+.stats-bar{display:flex;gap:8px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.stats-bar::-webkit-scrollbar{display:none;}
+.stat-btn{flex-shrink:0;padding:8px 14px;border-radius:20px;background:var(--card);border:1px solid var(--bd);color:var(--txt);font-size:13px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px}
+
+/* ── 饮食卡片 ── */
+.diet-card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:12px;}
+.diet-row{display:flex;justify-content:space-around;text-align:center;margin-top:10px;}
+.diet-item .val{font-size:24px;font-weight:700;color:var(--accent);}
+.diet-item .lbl{font-size:11px;color:var(--mt);margin-top:2px;}
+
+/* ── 小屏适配 ── */
+@media(max-width:380px){
+  .photo-thumb{width:65px;height:85px;}
+  .photo-thumb-label{width:65px;}
+  .circ-table td,.circ-table th{padding:6px 2px;font-size:10px;}
+}
+</style>
 </head>
 <body>
-  <div class="app-shell">
-    <header class="topbar">
-      <div class="topbar-main">
-        <button id="back-button" class="back-button hidden" type="button">返回首页</button>
 
-        <div class="brand-block">
-          <h1 id="page-title">林青交易看板</h1>
-          <p class="subtitle" id="page-subtitle">打开网页就能看持仓、下一步动作和未执行计划。</p>
-          <p class="sync-status sync-status-checking" id="sync-status">同步状态检查中...</p>
+<!-- ═══════ HOME ═══════ -->
+<div id="pageHome">
+  <div class="home-header">
+    <div class="greet" id="greeting">☀️ 早上好，JJ</div>
+    <div class="date" id="homeDate"></div>
+    <div class="quote" id="dailyQuote"></div>
+  </div>
+  <button class="wake-btn" id="wakeBtn" onclick="wakeUp()">🌅 已起床</button>
+  <div class="grid">
+    <div class="mod-card c1" onclick="navTo('fitness')"><span class="icon">💪</span><span class="title">健身</span><span class="sub">训练·饮食·体态</span></div>
+    <div class="mod-card c2" onclick="navTo('growth')"><span class="icon">🌱</span><span class="title">成长</span><span class="sub">读书·技能·复盘</span></div>
+    <div class="mod-card c3" onclick="navTo('hobby')"><span class="icon">🎨</span><span class="title">兴趣</span><span class="sub">手工·收藏·探索</span></div>
+    <div class="mod-card c4" onclick="navTo('money')"><span class="icon">💰</span><span class="title">赚钱项目</span><span class="sub">量化·副业·投资</span></div>
+    <div class="mod-card c5" onclick="navTo('creator')"><span class="icon">📸</span><span class="title">博主</span><span class="sub">小红书·内容·涨粉</span></div>
+    <div class="mod-card c6" onclick="navTo('work')"><span class="icon">💼</span><span class="title">工作</span><span class="sub">任务·日程·效率</span></div>
+  </div>
+</div>
+
+<!-- ═══════ 健身主页 ═══════ -->
+<div id="pageFitness" class="hide">
+  <button class="back-btn" onclick="navTo('home')">← 首页</button>
+  <div class="page">
+    <h1>💪 健身计划</h1>
+
+    <!-- 拍照小按钮（仅一行） -->
+    <div class="camera-strip">
+      <button class="cam-btn" onclick="openCamera('front')">📷 正面</button>
+      <button class="cam-btn" onclick="openCamera('side')">📷 侧面</button>
+      <button class="cam-btn" onclick="openCamera('back')">📷 背面</button>
+      <button class="cam-btn" onclick="openCamera('arm')">💪 大臂</button>
+    </div>
+
+    <!-- 进度信息 -->
+    <div class="progress-card">
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <div style="font-size:12px;color:var(--mt);">第 <span id="planCurrentDay">1</span> 天 / 共 56 天</div>
+          <div style="font-size:20px;font-weight:700;color:var(--accent);margin-top:4px;">8周计划</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:12px;color:var(--mt);">最新体重</div>
+          <div style="font-size:20px;font-weight:700;color:var(--ac2);margin-top:2px;"><span id="latestWeight">65</span>kg</div>
+	          <button class="cam-btn" onclick="recordWeight()" style="margin-top:4px;font-size:11px;padding:4px 10px;color:var(--accent);">➕ 记录体重</button>
         </div>
       </div>
-
-      <div class="header-actions">
-        <button id="reset-data-btn" class="secondary-button" type="button">重置为初始数据</button>
-        <button id="export-data-btn" class="secondary-button" type="button">导出 JSON</button>
-        <button id="import-data-btn" class="primary-button" type="button">导入 JSON</button>
-        <input id="import-file" type="file" accept="application/json" hidden>
+      <div style="margin-top:8px;">
+        <div style="height:10px;background:rgba(255,255,255,.04);border-radius:10px;overflow:hidden;">
+          <div id="planProgressBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--ac4),var(--ac2));"></div>
+        </div>
+        <div style="font-size:12px;color:var(--mt);margin-top:6px;text-align:right;">8周计划进度 <span id="planProgressText">0%</span></div>
+      <button class="func-btn" onclick="importWeightFromScale()" style="margin-top:10px;width:100%;font-size:12px;padding:10px;text-align:center;justify-content:center;">📲 导入体脂秤数据</button>
       </div>
-    </header>
+    </div>
 
-    <main class="page-content">
-      <section id="home-view" class="view is-active">
-        <div id="account-list" class="account-stack"></div>
-      </section>
+    <!-- 7天按钮 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px;margin-bottom:16px;">
+      <button class="day-btn" onclick="navToDayDetail(0)">📅 周一<br><span style="font-size:11px;color:var(--mt);">肩+核心</span></button>
+      <button class="day-btn" onclick="navToDayDetail(1)">📅 周二<br><span style="font-size:11px;color:var(--mt);">背+手臂</span></button>
+      <button class="day-btn" onclick="navToDayDetail(2)">📅 周三<br><span style="font-size:11px;color:var(--mt);">臀腿</span></button>
+      <button class="day-btn" onclick="navToDayDetail(3)">📅 周四<br><span style="font-size:11px;color:var(--mt);">胸+肩</span></button>
+      <button class="day-btn" onclick="navToDayDetail(4)">📅 周五<br><span style="font-size:11px;color:var(--mt);">背+腹</span></button>
+      <button class="day-btn" onclick="navToDayDetail(5)">📅 周六<br><span style="font-size:11px;color:var(--mt);">臀腿</span></button>
+      <button class="day-btn" onclick="navToDayDetail(6)" style="grid-column:1/-1;">📅 周日<br><span style="font-size:11px;color:var(--mt);">散步+恢复</span></button>
+    </div>
 
-      <section id="detail-view" class="view">
-        <div id="detail-content"></div>
-      </section>
-    </main>
+    <!-- 功能入口 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px;">
+      <button class="func-btn c1" onclick="showBodyIssues()">🏥 我的体态问题</button>
+      <button class="func-btn c2" onclick="showMoveGuide()">📖 动作解读</button>
+      <button class="func-btn c3" onclick="navTo('circumference')">📏 围度记录</button>
+      <button class="func-btn c4" onclick="navTo('photos')">📸 照片记录</button>
+    </div>
   </div>
+</div>
 
-  <script src="data.js"></script>
-  <script src="script.js"></script>
+<!-- ═══════ 每日训练详情 ═══════ -->
+<div id="pageFitnessDayDetail" class="hide">
+  <button class="back-btn" onclick="navTo('fitness')">← 返回</button>
+  <div class="page">
+    <h1 id="dayDetailTitle">💪 周一</h1>
+
+    <!-- 拍照小按钮 -->
+    <div class="camera-strip">
+      <button class="cam-btn" onclick="openCamera('front')">📷 正面</button>
+      <button class="cam-btn" onclick="openCamera('side')">📷 侧面</button>
+      <button class="cam-btn" onclick="openCamera('back')">📷 背面</button>
+      <button class="cam-btn" onclick="openCamera('arm')">💪 大臂</button>
+    </div>
+
+    <div id="dayDetailContent"></div>
+  </div>
+</div>
+
+<!-- ═══════ 体态问题 ═══════ -->
+<div id="pageBodyIssues" class="hide">
+  <button class="back-btn" onclick="navTo('fitness')">← 返回</button>
+  <div class="page">
+    <h1>🏥 我的体态问题</h1>
+    <div id="bodyIssuesContent"></div>
+  </div>
+</div>
+
+<!-- ═══════ 动作解读 ═══════ -->
+<div id="pageMoveGuide" class="hide">
+  <button class="back-btn" onclick="navTo('fitness')">← 返回</button>
+  <div class="page">
+    <h1>📖 动作解读</h1>
+    <div id="moveGuideContent"></div>
+  </div>
+</div>
+
+<!-- ═══════ 围度记录 ═══════ -->
+<div id="pageCircumference" class="hide">
+  <button class="back-btn" onclick="navTo('fitness')">← 返回</button>
+  <div class="page">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 0 14px;">
+      <h1 style="padding:0;">📏 围度记录</h1>
+      <button class="cam-btn" onclick="openCircForm()" style="color:var(--accent);font-weight:600;">+ 新增</button>
+    </div>
+    <div id="circumferenceContent"></div>
+  </div>
+</div>
+
+<!-- ═══════ 照片记录 ═══════ -->
+<div id="pagePhotos" class="hide">
+  <button class="back-btn" onclick="navTo('fitness')">← 返回</button>
+  <div class="page">
+    <h1>📸 照片记录</h1>
+    <div class="camera-strip" style="margin-bottom:12px;">
+      <button class="cam-btn" onclick="openCamera('front')">📷 正面</button>
+      <button class="cam-btn" onclick="openCamera('side')">📷 侧面</button>
+      <button class="cam-btn" onclick="openCamera('back')">📷 背面</button>
+      <button class="cam-btn" onclick="openCamera('arm')">💪 大臂</button>
+    </div>
+    <div id="photoGalleryContent"></div>
+  </div>
+</div>
+
+<!-- ═══════ 其他页面（占位） ═══════ -->
+<div id="pageGrowth" class="hide"><button class="back-btn" onclick="navTo('home')">← 首页</button><div class="page"><h1>🌱 成长</h1><p style="color:var(--mt);text-align:center;margin-top:40px;">读书笔记 · 技能树 · 周复盘 · 年度目标<br><br>📝 即将上线</p></div></div>
+<div id="pageHobby" class="hide"><button class="back-btn" onclick="navTo('home')">← 首页</button><div class="page"><h1>🎨 兴趣</h1><p style="color:var(--mt);text-align:center;margin-top:40px;">手工 · 收藏 · 探索<br><br>📝 即将上线</p></div></div>
+<div id="pageMoney" class="hide"><button class="back-btn" onclick="navTo('home')">← 首页</button><div class="page"><h1>💰 赚钱项目</h1><p style="color:var(--mt);text-align:center;margin-top:40px;">量化投资 · 副业追踪 · 收入仪表盘<br><br>📝 即将上线</p></div></div>
+<div id="pageCreator" class="hide"><button class="back-btn" onclick="navTo('home')">← 首页</button><div class="page"><h1>📸 博主</h1><p style="color:var(--mt);text-align:center;margin-top:40px;">小红书 · 内容日历 · 数据看板<br><br>📝 即将上线</p></div></div>
+<div id="pageWork" class="hide"><button class="back-btn" onclick="navTo('home')">← 首页</button><div class="page"><h1>💼 工作</h1><p style="color:var(--mt);text-align:center;margin-top:40px;">任务清单 · 日程 · 效率工具<br><br>📝 即将上线</p></div></div>
+
+<!-- ═══════ 拍照页面 ═══════ -->
+<div id="cameraPage" class="camera-page hide">
+  <div class="type-badge" id="cameraTypeBadge">📷 正面</div>
+  <video id="cameraVideo" autoplay playsinline></video>
+  <canvas id="cameraCanvas"></canvas>
+  <div class="ref-overlay" id="refOverlay" style="width:200px;height:340px;">
+    <div class="ref-label">站这里</div>
+  </div>
+  <div class="ref-guide">📱 手机与眼睛同高<br>👣 距墙一步<br>👕 紧身衣<br>🦶 与肩同宽</div>
+  <div class="cam-controls">
+    <button class="cam-cancel" onclick="closeCamera()">取消</button>
+    <button class="cam-shoot" onclick="capturePhoto()">📷 拍照</button>
+  </div>
+</div>
+
+<!-- ═══════ 照片全屏预览 ═══════ -->
+<div id="photoFullscreen" class="photo-fullscreen hide" onclick="closePhotoFullscreen()">
+  <button class="close-btn">✕</button>
+  <img id="photoFullImg" src="" alt="">
+  <div class="info-bar" id="photoFullInfo"></div>
+</div>
+
+<!-- ═══════ 弹窗容器 ═══════ -->
+<div class="modal-overlay hide" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modalContent" onclick="event.stopPropagation()"></div>
+</div>
+
+<!-- ═══════ 底部导航 ═══════ -->
+<div class="bottom-nav" id="bottomNav">
+  <button class="active" data-page="home" onclick="navTo('home')"><span class="ni">🏠</span>首页</button>
+  <button data-page="fitness" onclick="navTo('fitness')"><span class="ni">💪</span>健身</button>
+  <button data-page="circumference" onclick="navTo('circumference')"><span class="ni">📏</span>围度</button>
+  <button data-page="photos" onclick="navTo('photos')"><span class="ni">📸</span>照片</button>
+</div>
+
+<script>
+// ══════════════ CONSTANTS ══════════════
+const USER = { height:160, weight:65, age:32, gender:'F', bodyType:'apple', goal:57 };
+const START_DATE = new Date(2026,5,15);
+const DAY_LABELS = ['日','一','二','三','四','五','六'];
+
+// 体态问题
+const BODY_ISSUES = [
+  {issue:'圆肩', solution:'划船、飞鸟、欧阳春晓'},
+  {issue:'头前伸', solution:'飞鸟、胸椎伸展'},
+  {issue:'骨盆前倾', solution:'死虫、鸟狗、臀桥'},
+  {issue:'小腹突出', solution:'热量缺口+死虫'},
+  {issue:'手臂粗', solution:'侧平举减脂'},
+  {issue:'腰线不明显', solution:'减脂+肩部训练'},
+  {issue:'臀型不够饱满', solution:'保加利亚蹲+臀推+怪兽走'},
+];
+
+// 7天循环计划
+const WEEK_PLAN_NEW = [
+  { id:'周一', day:1, name:'肩部+核心', phases:[
+    { time:'早起后', items:[
+      {n:'9090呼吸', d:'7分钟', q:'9090呼吸'},
+      {n:'骨盆回正', d:'8分钟', q:'骨盆回正'}]},
+    { time:'午饭后', items:[
+      {n:'足弓训练', d:'20分钟', q:'足弓训练'}]},
+    { time:'正式训练（肩+核心）', items:[
+      {n:'9090呼吸', d:'2分钟', q:'9090呼吸'},
+      {n:'热身：招财猫热身', d:'×2', q:'招财猫热身'},
+      {n:'肩部环绕', d:'', q:'肩部环绕'},
+      {n:'支撑肩部外展', d:'', q:'支撑肩部外展'},
+      {n:'并合掌', d:'', q:'并合掌'},
+      {n:'正式训练：俯身上提', d:'×5', q:'俯身上提'},
+      {n:'坐姿飞鸟', d:'×5', q:'坐姿飞鸟'},
+      {n:'站姿推举', d:'×8', q:'站姿推举'},
+      {n:'侧平举', d:'×6', q:'侧平举'},
+      {n:'哑转捷拉', d:'×5', q:'哑转捷拉'},
+      {n:'核心：卷腹+坐姿举腿', d:'×3', q:'卷腹'},
+      {n:'死虫 Dead Bug', d:'3×12', q:'死虫'},
+      {n:'鸟狗 Bird Dog', d:'3×12', q:'鸟狗'}]},
+    { time:'睡前', items:[
+      {n:'拉伸', d:'10分钟', q:'拉伸'},
+      {n:'体态训练', d:'10分钟', q:'体态训练'}]}
+  ]},
+  { id:'周二', day:2, name:'背部+手臂', phases:[
+    { time:'早起后', items:[
+      {n:'9090呼吸', d:'7分钟', q:'9090呼吸'},
+      {n:'骨盆回正', d:'8分钟', q:'骨盆回正'}]},
+    { time:'午饭后', items:[
+      {n:'足弓训练', d:'10分钟', q:'足弓训练'},
+      {n:'胸椎灵活性', d:'10分钟', q:'胸椎灵活性'}]},
+    { time:'正式训练（背+手臂）', items:[
+      {n:'热身：招财猫热身', d:'', q:'招财猫热身'},
+      {n:'正式训练：俯身飞鸟', d:'×4', q:'俯身飞鸟'},
+      {n:'俯身划船', d:'×10', q:'俯身划船'},
+      {n:'单臂划船', d:'×10', q:'单臂划船'},
+      {n:'反向划船', d:'×5', q:'反向划船'},
+      {n:'坐姿山羊提举', d:'×5', q:'坐姿山羊提举'},
+      {n:'竖哑铃推举', d:'×5', q:'竖哑铃推举'}]},
+    { time:'睡前', items:[
+      {n:'拉伸', d:'10分钟', q:'拉伸'},
+      {n:'胸椎拉伸', d:'10分钟', q:'胸椎拉伸'}]}
+  ]},
+  { id:'周三', day:3, name:'臀腿', phases:[
+    { time:'早起后', items:[
+      {n:'9090呼吸', d:'7分钟', q:'9090呼吸'},
+      {n:'骨盆回正', d:'8分钟', q:'骨盆回正'}]},
+    { time:'午饭后', items:[
+      {n:'足弓训练', d:'5分钟', q:'足弓训练'},
+      {n:'骨盆回正', d:'5分钟', q:'骨盆回正'}]},
+    { time:'正式训练（臀腿）', items:[
+      {n:'热身：左右开胯', d:'各10次', q:'开胯'},
+      {n:'后侧拉伸', d:'', q:'后侧拉伸'},
+      {n:'青蛙趴', d:'', q:'青蛙趴'},
+      {n:'坐姿90°外展', d:'', q:'坐姿外展'},
+      {n:'站姿提拉', d:'×8', q:'站姿提拉'},
+      {n:'哑铃跨步', d:'×8', q:'哑铃跨步'},
+      {n:'跪推', d:'×6', q:'跪推'},
+      {n:'保加利亚蹲', d:'×10', q:'保加利亚蹲'},
+      {n:'蛤式开合 Clamshell', d:'3×20', q:'蛤式开合'},
+      {n:'弹力带', d:'3×20', q:'弹力带'}]},
+    { time:'睡前', items:[
+      {n:'拉伸', d:'10分钟', q:'拉伸'},
+      {n:'泡沫轴放松', d:'10分钟', q:'泡沫轴放松'}]}
+  ]},
+  { id:'周四', day:4, name:'胸部+肩部', phases:[
+    { time:'早起后', items:[
+      {n:'9090呼吸', d:'7分钟', q:'9090呼吸'},
+      {n:'骨盆回正', d:'8分钟', q:'骨盆回正'}]},
+    { time:'午饭后', items:[
+      {n:'足弓训练', d:'10分钟', q:'足弓训练'},
+      {n:'胸椎灵活性', d:'10分钟', q:'胸椎灵活性'}]},
+    { time:'正式训练（胸+肩）', items:[
+      {n:'热身：招财猫热身', d:'×2', q:'招财猫热身'},
+      {n:'肩部环绕', d:'', q:'肩部环绕'},
+      {n:'支撑肩部外展', d:'', q:'支撑肩部外展'},
+      {n:'并合掌', d:'', q:'并合掌'},
+      {n:'正式训练：跪姿俯卧撑', d:'×8', q:'跪姿俯卧撑'},
+      {n:'哑铃卧推', d:'×8', q:'哑铃卧推'},
+      {n:'哑铃阿诺德推举', d:'×6', q:'哑铃阿诺德推举'},
+      {n:'9090呼吸', d:'5分钟', q:'9090呼吸'}]},
+    { time:'睡前', items:[
+      {n:'拉伸', d:'10分钟', q:'拉伸'},
+      {n:'9090呼吸', d:'5分钟', q:'9090呼吸'}]}
+  ]},
+  { id:'周五', day:5, name:'背部+腹部', phases:[
+    { time:'早起后', items:[
+      {n:'9090呼吸', d:'7分钟', q:'9090呼吸'},
+      {n:'骨盆回正', d:'8分钟', q:'骨盆回正'}]},
+    { time:'午饭后', items:[
+      {n:'足弓训练', d:'20分钟', q:'足弓训练'}]},
+    { time:'正式训练（背+腹）', items:[
+      {n:'热身：招财猫热身', d:'', q:'招财猫热身'},
+      {n:'正式训练：跪姿俯卧撑', d:'×5', q:'跪姿俯卧撑'},
+      {n:'俯身划船', d:'×8', q:'俯身划船'},
+      {n:'单臂划船', d:'×10', q:'单臂划船'},
+      {n:'反向划船', d:'×5', q:'反向划船'},
+      {n:'腿部灵活性', d:'8分钟', q:'腿部灵活性'},
+      {n:'腿抬', d:'×5', q:'腿抬'},
+      {n:'负重卷腹', d:'', q:'负重'},
+      {n:'侧桥', d:'左右各30秒', q:'侧桥'},
+      {n:'9090呼吸', d:'5分钟', q:'9090呼吸'}]},
+    { time:'睡前', items:[
+      {n:'拉伸', d:'10分钟', q:'拉伸'},
+      {n:'泡沫轴放松', d:'10分钟', q:'泡沫轴放松'}]}
+  ]},
+  { id:'周六', day:6, name:'臀腿', phases:[
+    { time:'早起后', items:[
+      {n:'9090呼吸', d:'7分钟', q:'9090呼吸'},
+      {n:'骨盆回正', d:'8分钟', q:'骨盆回正'}]},
+    { time:'午饭后', items:[
+      {n:'足弓训练', d:'5分钟', q:'足弓训练'},
+      {n:'骨盆回正', d:'5分钟', q:'骨盆回正'}]},
+    { time:'正式训练（臀腿）', items:[
+      {n:'热身：左右开胯', d:'', q:'开胯'},
+      {n:'后侧伸展', d:'', q:'伸展'},
+      {n:'大腿前侧拉伸', d:'', q:'拉伸'},
+      {n:'半蹲转腰', d:'', q:'转腰'},
+      {n:'青蛙趴', d:'', q:'青蛙趴'},
+      {n:'并合掌', d:'', q:'并合掌'},
+      {n:'正式训练：臀推', d:'×8', q:'臀推'},
+      {n:'腿抬', d:'×8', q:'腿抬'},
+      {n:'怪兽走', d:'×5', q:'怪兽走'},
+      {n:'坐姿抬腿', d:'×5', q:'腿抬'},
+      {n:'蛤式开合 Clamshell', d:'3×20', q:'蛤式开合'},
+      {n:'弹力带', d:'3×20', q:'弹力带'}]},
+    { time:'睡前', items:[
+      {n:'拉伸', d:'10分钟', q:'拉伸'},
+      {n:'泡沫轴放松', d:'5分钟', q:'泡沫轴放松'},
+      {n:'9090呼吸', d:'5分钟', q:'9090呼吸'}]}
+  ]},
+  { id:'周日', day:0, name:'散步+恢复', phases:[
+    { time:'早起后', items:[
+      {n:'9090呼吸', d:'7分钟', q:'9090呼吸'},
+      {n:'骨盆回正', d:'3分钟', q:'骨盆回正'}]},
+    { time:'主要', items:[
+      {n:'散步', d:'60分钟', q:'散步'}]},
+    { time:'睡前', items:[
+      {n:'拉伸', d:'10分钟', q:'拉伸'},
+      {n:'泡沫轴放松', d:'5分钟', q:'泡沫轴放松'},
+      {n:'9090呼吸', d:'5分钟', q:'9090呼吸'}]}
+  ]}
+];
+
+// ══════════════ STATE ══════════════
+let PROGRAM_WEEK = 1;
+let LATEST_WEIGHT = 65;
+let logs = {};
+let currentDay = 0;
+let wakeTime = null;
+let userSettings = { periodStart:null, stepGoalStrength:8000, stepGoalRest:11000, programWeek:1, latestWeight:65 };
+let cameraStream = null;
+let currentPhotoType = 'front';
+let DAY_DETAIL_FILTER = { onlyIncomplete: false };
+
+let wakeLogs = [];
+function getWakeLogs() {
+  try { return JSON.parse(localStorage.getItem('jj_wake_logs')||'[]'); } catch(e) { return []; }
+}
+function saveWakeLogs(data) { localStorage.setItem('jj_wake_logs', JSON.stringify(data)); }
+function getTodayStr() { return new Date().toISOString().slice(0,10); }
+
+function load() {
+  try { logs = JSON.parse(localStorage.getItem('jj_logs')||'{}'); } catch(e) { logs={}; }
+  try { const s = JSON.parse(localStorage.getItem('jj_settings')||'{}'); userSettings = {...userSettings,...s}; } catch(e) {}
+  try { wakeTime = localStorage.getItem('jj_wake') || null; } catch(e) {}
+  try { wakeLogs = getWakeLogs(); } catch(e) { wakeLogs = []; }
+  // 检查今天是否已记录起床
+  const todayRecord = wakeLogs.find(w => w.date === getTodayStr());
+  if (todayRecord) wakeTime = todayRecord.wakeTime;
+  if (userSettings.programWeek) PROGRAM_WEEK = userSettings.programWeek;
+  if (userSettings.latestWeight) LATEST_WEIGHT = userSettings.latestWeight;
+}
+function save() { localStorage.setItem('jj_logs', JSON.stringify(logs)); }
+function saveSettings() { localStorage.setItem('jj_settings', JSON.stringify(userSettings)); }
+function dk(d) { return 'D'+(d+1); }
+function getLog(d) {
+  const k = dk(d);
+  if (!logs[k]) logs[k] = {checked:false, exDone:{}, tracked:{}, wake:null, weight:'', steps:'', cal:'', pro:'', sleep:'', energy:''};
+  return logs[k];
+}
+function getTodayIndex() {
+  return Math.max(0, Math.min(29, Math.floor((new Date() - START_DATE) / (1000*60*60*24))));
+}
+
+// ── 经期 ──
+let periodStart = null;
+const PERIOD_LEN = 5;
+const CYCLE_LEN = 28;
+function getPeriodPhase(dayOffset) {
+  if (!periodStart) return 'normal';
+  const d = new Date(START_DATE); d.setDate(d.getDate()+dayOffset);
+  const ps = new Date(periodStart);
+  const diffDays = Math.floor((d - ps) / (1000*60*60*24));
+  let cycleDay = ((diffDays % CYCLE_LEN) + CYCLE_LEN) % CYCLE_LEN;
+  if (cycleDay < 2) return 'd1-2';
+  if (cycleDay < PERIOD_LEN) return 'd3-5';
+  if (cycleDay < 6) return 'post';
+  if (cycleDay >= 12 && cycleDay <= 16) return 'ovu';
+  if (cycleDay >= 22) return 'pms';
+  return 'normal';
+}
+function getPeriodLabel(phase) {
+  const map = {'d1-2':'🔴 经期1-2天·暂停力量','d3-5':'🟠 经期3-5天·力量减半','post':'🟡 经后恢复','ovu':'🟢 排卵期·冲重量','pms':'🟣 PMS·适度训练','normal':'⚪ 卵泡期'};
+  return map[phase]||'⚪ 卵泡期';
+}
+
+// ══════════════ NAV ══════════════
+function navTo(page) {
+  if (page === 'money') {
+    window.location.href = 'finance.html';
+    return;
+  }
+  ['tmpRecords','tmpSettings'].forEach(id => { const el = document.getElementById(id); if(el) el.remove(); });
+  document.querySelectorAll('[id^="page"]').forEach(el => el.classList.add('hide'));
+  const target = document.getElementById('page'+page.charAt(0).toUpperCase()+page.slice(1));
+  if (target) target.classList.remove('hide');
+  document.querySelectorAll('#bottomNav button').forEach(b => {
+    b.classList.toggle('active', b.dataset.page === page || (page==='home'&&b.dataset.page==='home'));
+  });
+  if (page==='home') renderHome();
+  if (page==='fitness') renderFitness();
+  if (page==='circumference') renderCircumference();
+  if (page==='photos') renderPhotoGallery();
+}
+
+function navToDayDetail(dayIndex) {
+  document.getElementById('pageFitness').classList.add('hide');
+  document.getElementById('pageHome').classList.add('hide');
+  document.getElementById('pageFitnessDayDetail').classList.remove('hide');
+  renderDayDetail(dayIndex);
+}
+
+// ══════════════ HOME ══════════════
+function renderHome() {
+  const now = new Date();
+  const h = now.getHours();
+  let g = '☀️ 早上好，JJ';
+  if (h < 6) g = '🌙 夜深了，JJ';
+  else if (h < 12) g = '☀️ 早上好，JJ';
+  else if (h < 18) g = '🌤️ 下午好，JJ';
+  else g = '🌆 晚上好，JJ';
+  document.getElementById('greeting').textContent = g;
+  document.getElementById('homeDate').textContent = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()} 周${DAY_LABELS[now.getDay()]}`;
+  const quotes = ['今天也是变好的一天 ✨','每一次流汗都在靠近目标 💪','苹果身材不可怕，体态即是答案 🍎','坚持健身，改变人生 🔥','先完成，再完美 📝','动起来就赢了 90% 的人 🏃','7天循环，重复精进 🔄'];
+  document.getElementById('dailyQuote').textContent = quotes[Math.floor(Math.random()*quotes.length)];
+  // 起床按钮状态
+  const todayRecord = wakeLogs.find(w => w.date === getTodayStr());
+  const btn = document.getElementById('wakeBtn');
+  if (btn) {
+    if (todayRecord) {
+      btn.textContent = `🌅 已起床 · ${todayRecord.wakeTime}`;
+      btn.style.opacity = '0.65';
+    } else {
+      btn.textContent = '🌅 已起床';
+      btn.style.opacity = '1';
+    }
+  }
+}
+
+function wakeUp() {
+  const today = getTodayStr();
+  const logs = getWakeLogs();
+  const already = logs.find(w => w.date === today);
+  if (already) {
+    alert(`今天已记录起床时间：${already.wakeTime}`);
+    return;
+  }
+  const now = new Date();
+  wakeTime = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+  logs.push({ date: today, wakeTime: wakeTime });
+  saveWakeLogs(logs);
+  wakeLogs = logs;
+  // 同步到旧版兼容
+  localStorage.setItem('jj_wake', wakeTime);
+  const log = getLog(getTodayIndex());
+  log.wake = wakeTime;
+  save();
+  // 更新按钮
+  const btn = document.getElementById('wakeBtn');
+  btn.textContent = `🌅 已起床 · ${wakeTime}`;
+  btn.style.opacity = '0.65';
+  setTimeout(() => { btn.style.opacity = '1'; }, 2000);
+}
+
+// ══════════════ FITNESS ══════════════
+function renderFitness() {
+  document.getElementById('latestWeight').textContent = LATEST_WEIGHT;
+  updatePlanProgress();
+}
+
+function updatePlanProgress() {
+  const totalDays = 8 * 7;
+  const today = new Date();
+  const diffMs = today - START_DATE;
+  const currentDay = Math.max(1, Math.floor(diffMs / (1000*60*60*24)) + 1);
+  const pct = Math.min(100, Math.round(currentDay / totalDays * 100));
+  const elDay = document.getElementById('planCurrentDay');
+  if (elDay) elDay.textContent = currentDay;
+  const elBar = document.getElementById('planProgressBar');
+  if (elBar) elBar.style.width = pct + '%';
+  const elTxt = document.getElementById('planProgressText');
+  if (elTxt) elTxt.textContent = pct + '%';
+}
+
+// ══════════════ WEIGHT ══════════════
+function getWeightLogs() {
+  try { return JSON.parse(localStorage.getItem('jj_weight_logs')||'[]'); } catch(e) { return []; }
+}
+function saveWeightLogs(data) { localStorage.setItem('jj_weight_logs', JSON.stringify(data)); }
+
+function recordWeight() {
+  const input = prompt('请输入今日体重（kg）', LATEST_WEIGHT.toString());
+  if (input === null) return;
+  const weight = parseFloat(input);
+  if (isNaN(weight) || weight <= 0) {
+    alert('请输入有效的体重数值');
+    return;
+  }
+  const today = getTodayStr();
+  const weightLogs = getWeightLogs();
+  const existIdx = weightLogs.findIndex(w => w.date === today);
+  if (existIdx >= 0) {
+    weightLogs[existIdx].weight = weight;
+  } else {
+    weightLogs.push({ date: today, weight: weight });
+  }
+  saveWeightLogs(weightLogs);
+  LATEST_WEIGHT = weight;
+  userSettings.latestWeight = weight;
+  saveSettings();
+  const circData = getCircumference();
+  const circExist = circData.findIndex(c => c.date === today);
+  if (circExist >= 0) {
+    circData[circExist].weight = weight.toString();
+  } else {
+    circData.push({ date: today, weight: weight.toString(), arm: '', waist: '', thigh: '', hip: '', note: '' });
+  }
+  saveCircumference(circData);
+  document.getElementById('latestWeight').textContent = weight;
+  alert('✅ 体重已记录：' + weight + 'kg');
+}
+
+async function importWeightFromScale() {
+  alert("当前暂未接入体脂秤数据，请先手动记录体重。以后可通过苹果健康/CSV导入/API接入。");
+}
+
+// ══════════════ DAY DETAIL ══════════════
+function renderDayDetail(dayIndex) {
+  DAY_DETAIL_FILTER.onlyIncomplete = DAY_DETAIL_FILTER.onlyIncomplete || false;
+  const dayData = WEEK_PLAN_NEW[dayIndex];
+  const dayLog = getLog(dayIndex);
+
+  document.getElementById('dayDetailTitle').textContent = `💪 ${dayData.id} · ${dayData.name}`;
+
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
+    <label style="font-size:13px;color:var(--mt);"><input type=checkbox id=filterOnlyIncomplete ${DAY_DETAIL_FILTER.onlyIncomplete?'checked':''} onchange="DAY_DETAIL_FILTER.onlyIncomplete=this.checked;renderDayDetail(${dayIndex})"> 只看未完成</label>
+  </div>`;
+
+  dayData.phases.forEach((phase, pidx) => {
+    html += `<div class="day-phase">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div class="day-phase-title">${phase.time}</div>
+        <button class="cam-btn" onclick="markPhaseDone(${dayIndex}, '${phase.time.replace(/'/g,"\\'")}')" style="font-size:11px;">全部完成</button>
+      </div>`;
+
+    phase.items.forEach((item, idx) => {
+      const moveId = `${dayIndex}_${phase.time}_${idx}`;
+      const isDone = dayLog.exDone?.[moveId];
+      if (DAY_DETAIL_FILTER.onlyIncomplete && isDone) return;
+      html += `
+        <div class="day-move${isDone ? ' done' : ''}" onclick="toggleDayMove('${moveId}', ${dayIndex})">
+          <div class="checkbox">${isDone ? '✓' : ''}</div>
+          <div class="move-info">
+            <div class="move-name">${item.n}</div>
+            <div class="move-desc">${item.d}</div>
+          </div>
+          ${item.q ? `<div style="color:var(--ac2);cursor:pointer;padding-right:8px;font-size:18px;" onclick="event.stopPropagation();window.open('https://search.bilibili.com/all?keyword=${encodeURIComponent(item.q)}','_blank')">▶</div>` : ''}
+        </div>`;
+    });
+
+    html += '</div>';
+  });
+
+  document.getElementById('dayDetailContent').innerHTML = html;
+  updatePlanProgress();
+}
+
+function markPhaseDone(dayIndex, phaseTime) {
+  const dayData = WEEK_PLAN_NEW[dayIndex];
+  const phase = dayData.phases.find(p=>p.time===phaseTime);
+  if (!phase) return;
+  const log = getLog(dayIndex);
+  if (!log.exDone) log.exDone = {};
+  phase.items.forEach((it, idx) => {
+    const moveId = `${dayIndex}_${phase.time}_${idx}`;
+    log.exDone[moveId] = true;
+  });
+  save(); renderDayDetail(dayIndex);
+}
+
+function toggleDayMove(moveId, dayIndex) {
+  const log = getLog(dayIndex);
+  if (!log.exDone) log.exDone = {};
+  log.exDone[moveId] = !log.exDone[moveId];
+  save();
+  renderDayDetail(dayIndex);
+}
+
+// ══════════════ BODY ISSUES ══════════════
+function showBodyIssues() {
+  document.getElementById('pageFitness').classList.add('hide');
+  document.getElementById('pageHome').classList.add('hide');
+  document.getElementById('pageBodyIssues').classList.remove('hide');
+  renderBodyIssues();
+}
+function renderBodyIssues() {
+  let html = '';
+  BODY_ISSUES.forEach(item => {
+    html += `<div class="issue-card"><div class="issue-title">🔴 ${item.issue}</div><div class="issue-solution">${item.solution}</div></div>`;
+  });
+  document.getElementById('bodyIssuesContent').innerHTML = html;
+}
+
+// ══════════════ MOVE GUIDE (动作解读) ══════════════
+function showMoveGuide() {
+  document.getElementById('pageFitness').classList.add('hide');
+  document.getElementById('pageHome').classList.add('hide');
+  document.getElementById('pageMoveGuide').classList.remove('hide');
+  renderMoveGuide();
+}
+
+function getMoveNotes() {
+  try { return JSON.parse(localStorage.getItem('jj_move_notes')||'{}'); } catch(e) { return {}; }
+}
+function saveMoveNotes(notes) { localStorage.setItem('jj_move_notes', JSON.stringify(notes)); }
+
+function renderMoveGuide() {
+  // Collect all unique moves
+  const moveMap = new Map();
+  WEEK_PLAN_NEW.forEach(day => {
+    day.phases.forEach(phase => {
+      phase.items.forEach(item => {
+        const key = item.n;
+        if (!moveMap.has(key)) {
+          moveMap.set(key, { name: item.n, days: [day.name] });
+        } else if (!moveMap.get(key).days.includes(day.name)) {
+          moveMap.get(key).days.push(day.name);
+        }
+      });
+    });
+  });
+
+  const moves = Array.from(moveMap.values());
+  const notes = getMoveNotes();
+
+  let html = `<p style="font-size:12px;color:var(--mt);margin-bottom:8px;">点击「注意事项」列即可编辑，自动保存到本地</p>`;
+  html += `<div style="overflow-x:auto;"><table class="guide-table">
+    <tr><th>动作</th><th>所属训练日</th><th>注意事项</th><th style="width:40px;"></th></tr>`;
+  moves.forEach(m => {
+    const note = notes[m.name] || '';
+    html += `<tr>
+      <td style="font-weight:500;">${m.name}</td>
+      <td style="color:var(--ac2);font-size:12px;">${m.days.join('、')}</td>
+      <td class="note-cell" onclick="editMoveNote('${m.name.replace(/'/g,"\\'")}')">${note || ''}</td>
+      <td><button class="cam-btn" style="font-size:10px;padding:4px 8px;" onclick="editMoveNote('${m.name.replace(/'/g,"\\'")}')">✏️</button></td>
+    </tr>`;
+  });
+  html += '</table></div>';
+  document.getElementById('moveGuideContent').innerHTML = html;
+}
+
+function editMoveNote(moveName) {
+  const notes = getMoveNotes();
+  const current = notes[moveName] || '';
+  showModal(`
+    <h3>📝 ${moveName}</h3>
+    <textarea id="editNoteText" rows="4" placeholder="记录动作心得、注意事项...">${current.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+    <div class="btn-row">
+      <button class="primary" onclick="saveMoveNote('${moveName.replace(/'/g,"\\'")}')">保存</button>
+      <button class="secondary" onclick="document.getElementById('modalOverlay').classList.add('hide')">取消</button>
+    </div>`);
+}
+
+function saveMoveNote(moveName) {
+  const notes = getMoveNotes();
+  notes[moveName] = document.getElementById('editNoteText').value;
+  saveMoveNotes(notes);
+  document.getElementById('modalOverlay').classList.add('hide');
+  renderMoveGuide();
+}
+
+// ══════════════ CIRCUMFERENCE (围度记录) ══════════════
+function getCircumference() {
+  try { return JSON.parse(localStorage.getItem('jj_circumference')||'[]'); } catch(e) { return []; }
+}
+function saveCircumference(data) { localStorage.setItem('jj_circumference', JSON.stringify(data)); }
+
+function renderCircumference() {
+  const data = getCircumference();
+  data.sort((a,b) => b.date.localeCompare(a.date));
+
+  let html = '';
+  if (data.length === 0) {
+    html = `<p style="text-align:center;color:var(--mt);padding:40px 0;">还没有围度记录<br>点击右上角「+ 新增」开始记录</p>`;
+  } else {
+    html = `<div style="overflow-x:auto;"><table class="circ-table">
+      <tr><th>日期</th><th>体重(kg)</th><th>上臂围(cm)</th><th>肚脐围(cm)</th><th>大腿围(cm)</th><th>臀围(cm)</th><th>备注</th><th></th></tr>`;
+    data.forEach((r, i) => {
+      html += `<tr>
+        <td>${r.date}</td><td>${r.weight||'-'}</td><td>${r.arm||'-'}</td><td>${r.waist||'-'}</td><td>${r.thigh||'-'}</td><td>${r.hip||'-'}</td>
+        <td style="font-size:11px;color:var(--mt);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.note||'-'}</td>
+        <td><button class="circ-table del-btn" onclick="deleteCircRecord(${i})">🗑</button></td>
+      </tr>`;
+    });
+    html += '</table></div>';
+  }
+
+  document.getElementById('circumferenceContent').innerHTML = html;
+}
+
+function openCircForm(editIdx) {
+  const data = getCircumference();
+  const record = (editIdx !== undefined) ? data[editIdx] : { date: new Date().toISOString().slice(0,10), weight:'', arm:'', waist:'', thigh:'', hip:'', note:'' };
+  showModal(`
+    <h3>${editIdx!==undefined?'编辑':'新增'}围度记录</h3>
+    <label>日期</label><input type="date" id="circDate" value="${record.date}">
+    <label>体重 (kg)</label><input type="number" id="circWeight" value="${record.weight||''}" placeholder="65" step="0.1">
+    <label>上臂围 (cm)</label><input type="number" id="circArm" value="${record.arm||''}" placeholder="28" step="0.1">
+    <label>肚脐围 (cm)</label><input type="number" id="circWaist" value="${record.waist||''}" placeholder="78" step="0.1">
+    <label>大腿围 (cm)</label><input type="number" id="circThigh" value="${record.thigh||''}" placeholder="52" step="0.1">
+    <label>臀围 (cm)</label><input type="number" id="circHip" value="${record.hip||''}" placeholder="94" step="0.1">
+    <label>备注</label><input type="text" id="circNote" value="${(record.note||'').replace(/"/g,'&quot;')}" placeholder="例：早起空腹">
+    <div class="btn-row">
+      <button class="primary" onclick="saveCircRecord(${editIdx!==undefined?editIdx:-1})">保存</button>
+      <button class="secondary" onclick="document.getElementById('modalOverlay').classList.add('hide')">取消</button>
+    </div>`);
+}
+
+function saveCircRecord(editIdx) {
+  const data = getCircumference();
+  const record = {
+    date: document.getElementById('circDate').value,
+    weight: document.getElementById('circWeight').value,
+    arm: document.getElementById('circArm').value,
+    waist: document.getElementById('circWaist').value,
+    thigh: document.getElementById('circThigh').value,
+    hip: document.getElementById('circHip').value,
+    note: document.getElementById('circNote').value
+  };
+  if (editIdx >= 0) {
+    data[editIdx] = record;
+  } else {
+    data.push(record);
+  }
+  saveCircumference(data);
+  document.getElementById('modalOverlay').classList.add('hide');
+  renderCircumference();
+}
+
+function deleteCircRecord(idx) {
+  if (!confirm('确认删除这条记录？')) return;
+  const data = getCircumference();
+  data.splice(idx, 1);
+  saveCircumference(data);
+  renderCircumference();
+}
+
+// ══════════════ PHOTO SYSTEM ══════════════
+function getPhotos() {
+  try { return JSON.parse(localStorage.getItem('jj_photos')||'[]'); } catch(e) { return []; }
+}
+function savePhotos(data) { localStorage.setItem('jj_photos', JSON.stringify(data)); }
+
+function renderPhotoGallery() {
+  const photos = getPhotos();
+  photos.sort((a,b) => b.date.localeCompare(a.date));
+
+  const types = [
+    { key: 'front', label: '📷 正面' },
+    { key: 'side', label: '📷 侧面' },
+    { key: 'back', label: '📷 背面' },
+    { key: 'arm', label: '💪 大臂' }
+  ];
+
+  let html = '';
+
+  types.forEach(t => {
+    const typePhotos = photos.filter(p => p.type === t.key);
+    html += `<div class="photo-group">
+      <div class="photo-group-title">${t.label} <span style="font-size:11px;color:var(--mt);">(${typePhotos.length}张)</span></div>`;
+
+    if (typePhotos.length === 0) {
+      html += `<div class="photo-empty">暂无${t.label}照片，点击上方按钮拍照</div>`;
+    } else {
+      html += `<div class="photo-thumb-list">`;
+      typePhotos.forEach((p, i) => {
+        const dateLabel = p.date.slice(5);
+        html += `<div>
+          <img class="photo-thumb" src="${p.imageData}" onclick="viewPhotoFull('${t.key}',${i})" loading="lazy">
+          <div class="photo-thumb-label">${dateLabel}</div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+    html += `</div>`;
+  });
+
+  document.getElementById('photoGalleryContent').innerHTML = html;
+}
+
+function viewPhotoFull(type, idx) {
+  const photos = getPhotos().filter(p => p.type === type).sort((a,b) => b.date.localeCompare(a.date));
+  const photo = photos[idx];
+  if (!photo) return;
+  document.getElementById('photoFullImg').src = photo.imageData;
+  document.getElementById('photoFullInfo').textContent = `${photo.date} · ${photo.type}${photo.note?' · '+photo.note:''}`;
+  document.getElementById('photoFullscreen').classList.remove('hide');
+}
+
+function closePhotoFullscreen() {
+  document.getElementById('photoFullscreen').classList.add('hide');
+}
+
+// ══════════════ CAMERA ══════════════
+async function openCamera(type) {
+  currentPhotoType = type;
+  const typeLabels = { front:'📷 正面', side:'📷 侧面', back:'📷 背面', arm:'💪 大臂' };
+  document.getElementById('cameraTypeBadge').textContent = typeLabels[type] || type;
+  document.getElementById('cameraPage').classList.remove('hide');
+
+  try {
+    const constraints = { video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1440 } } };
+    cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+    document.getElementById('cameraVideo').srcObject = cameraStream;
+  } catch(e) {
+    // Fallback: open file picker
+    closeCamera();
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.onchange = (ev) => {
+      const file = ev.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        savePhotoData(reader.result);
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+}
+
+function closeCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  document.getElementById('cameraVideo').srcObject = null;
+  document.getElementById('cameraPage').classList.add('hide');
+}
+
+function capturePhoto() {
+  const video = document.getElementById('cameraVideo');
+  const canvas = document.getElementById('cameraCanvas');
+  canvas.width = video.videoWidth || 1080;
+  canvas.height = video.videoHeight || 1440;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const imageData = canvas.toDataURL('image/jpeg', 0.85);
+
+  closeCamera();
+  savePhotoData(imageData);
+}
+
+function savePhotoData(imageData) {
+  const record = {
+    date: new Date().toISOString().slice(0,10),
+    type: currentPhotoType,
+    imageData: imageData,
+    note: ''
+  };
+  const photos = getPhotos();
+  photos.push(record);
+  savePhotos(photos);
+
+  // Show brief note input
+  showModal(`
+    <h3>✅ 照片已保存</h3>
+    <p style="font-size:13px;color:var(--mt);margin-bottom:8px;">${record.date} · ${currentPhotoType}</p>
+    <img src="${imageData}" style="width:100%;max-height:200px;object-fit:contain;border-radius:8px;margin-bottom:10px;">
+    <label>备注（可选）</label>
+    <input type="text" id="photoNoteInput" placeholder="例：空腹、晨起">
+    <div class="btn-row">
+      <button class="primary" onclick="savePhotoNote()">保存</button>
+      <button class="secondary" onclick="document.getElementById('modalOverlay').classList.add('hide')">跳过</button>
+    </div>`);
+}
+
+function savePhotoNote() {
+  const note = document.getElementById('photoNoteInput')?.value || '';
+  const photos = getPhotos();
+  if (photos.length > 0) {
+    photos[photos.length-1].note = note;
+    savePhotos(photos);
+  }
+  document.getElementById('modalOverlay').classList.add('hide');
+}
+
+// ══════════════ MODALS (从健身页调用) ══════════════
+function closeModal(e) { if (e.target === document.getElementById('modalOverlay')) document.getElementById('modalOverlay').classList.add('hide'); }
+function showModal(html) { document.getElementById('modalContent').innerHTML = html; document.getElementById('modalOverlay').classList.remove('hide'); }
+
+// ══════════════ SETTINGS ══════════════
+function showSettings() {
+  let html = '<button class="back-btn" onclick="navTo(\'home\')">← 首页</button><div class="page"><h1>⚙️ 设置</h1>';
+  html += `<div style="background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:12px;">
+    <h3 style="margin-bottom:10px;">🏃 步数目标</h3>
+    <label>力量训练日目标（周一/二/四/五/六）</label><input type="number" id="setStepStr" value="${userSettings.stepGoalStrength}" step="500">
+    <label>恢复日目标（周日）</label><input type="number" id="setStepRest" value="${userSettings.stepGoalRest}" step="500">
+    <hr style="margin:10px 0;opacity:.06;">
+    <h3 style="margin-bottom:10px;">📅 计划与体重</h3>
+    <label>当前第几周（1-8）</label><input type="number" id="setProgramWeek" value="${userSettings.programWeek||PROGRAM_WEEK}" step="1" min="1" max="8">
+    <label>最新体重(kg)</label><input type="number" id="setLatestWeight" value="${userSettings.latestWeight||LATEST_WEIGHT}" step="0.1">
+    <div class="btn-row" style="margin-top:12px;"><button class="primary" onclick="saveAllSettings()">保存设置</button></div>
+    <p style="font-size:11px;color:var(--mt);margin-top:10px;">
+      🩸 经期在健身页设置<br>
+      🔴 经期1-2天自动暂停力量<br>
+      🟠 经期3-5天力量减半<br>
+      🟢 排卵期可冲刺突破
+    </p>
+  </div></div>`;
+  document.querySelectorAll('[id^="page"]').forEach(el => el.classList.add('hide'));
+  document.getElementById('pageFitness').insertAdjacentHTML('afterend', `<div id="tmpSettings">${html}</div>`);
+  document.querySelectorAll('#bottomNav button').forEach(b => b.classList.remove('active'));
+}
+
+function saveAllSettings() {
+  userSettings.stepGoalStrength = parseInt(document.getElementById('setStepStr').value)||8000;
+  userSettings.stepGoalRest = parseInt(document.getElementById('setStepRest').value)||11000;
+  const pw = parseInt(document.getElementById('setProgramWeek')?.value);
+  const lw = parseFloat(document.getElementById('setLatestWeight')?.value);
+  if (!isNaN(pw) && pw>0) { userSettings.programWeek = pw; PROGRAM_WEEK = pw; }
+  if (!isNaN(lw) && lw>0) { userSettings.latestWeight = lw; LATEST_WEIGHT = lw; }
+  saveSettings();
+  const t = document.getElementById('tmpSettings'); if(t) t.remove();
+  navTo('fitness');
+}
+
+// ══════════════ RECORDS (兼容旧版) ══════════════
+function showRecords() { navTo('circumference'); }
+
+// ══════════════ VOICE INPUT ══════════════
+let recognition = null;
+function startVoice() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) { alert('浏览器不支持语音'); return; }
+  if (!recognition) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SR();
+    recognition.lang = 'zh-CN';
+    recognition.interimResults = false;
+    recognition.onresult = function(e) {
+      const t = e.results[0][0].transcript;
+      const log = getLog(currentDay);
+      const m = t.match(/体重\s*(\d+\.?\d*)/); if(m) log.weight = m[1];
+      const s = t.match(/步数\s*(\d+)/); if(s) log.steps = s[1];
+      save();
+    };
+  }
+  recognition.start();
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'v' && e.ctrlKey) { e.preventDefault(); startVoice(); }
+});
+
+// ══════════════ INIT ══════════════
+load();
+currentDay = getTodayIndex();
+if (userSettings.periodStart) periodStart = userSettings.periodStart;
+
+// Sunday reminder
+const today = new Date();
+if (today.getDay() === 0 && !getLog(currentDay).tracked?.measured) {
+  setTimeout(() => {
+    if (Notification.permission === 'granted') {
+      new Notification('📏 今天是量围度日！', {body:'记得量腰围、臀围、大腿围、小腿围、上臂围'});
+    }
+  }, 1000*60*30);
+}
+if (Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+
+renderHome();
+</script>
+<script src="fitness-sync.js"></script>
 </body>
 </html>
