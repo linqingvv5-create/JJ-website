@@ -1,0 +1,7 @@
+__pycache__/
+.git
+.github
+.agents
+.codex
+state.json
+*.tmp

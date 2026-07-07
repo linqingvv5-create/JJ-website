@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>林青交易看板</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-main">
+        <button id="back-button" class="back-button hidden" type="button">返回首页</button>
+
+        <div class="brand-block">
+          <h1 id="page-title">林青交易看板</h1>
+          <p class="subtitle" id="page-subtitle">打开网页就能看持仓、下一步动作和未执行计划。</p>
+          <p class="sync-status sync-status-checking" id="sync-status">同步状态检查中...</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="reset-data-btn" class="secondary-button" type="button">重置为初始数据</button>
+        <button id="export-data-btn" class="secondary-button" type="button">导出 JSON</button>
+        <button id="import-data-btn" class="primary-button" type="button">导入 JSON</button>
+        <input id="import-file" type="file" accept="application/json" hidden>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <section id="home-view" class="view is-active">
+        <div id="account-list" class="account-stack"></div>
+      </section>
+
+      <section id="detail-view" class="view">
+        <div id="detail-content"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
