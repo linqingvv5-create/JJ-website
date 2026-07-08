@@ -1,0 +1,31 @@
+{
+  "id": "/",
+  "name": "JJ 个人系统",
+  "short_name": "JJ App",
+  "description": "把健身、成长、兴趣、赚钱项目、博主和工作收在一起的个人网页 App。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d0d14",
+  "theme_color": "#0d0d14",
+  "icons": [
+    {
+      "src": "/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "交易看板",
+      "short_name": "看板",
+      "url": "/finance.html"
+    },
+    {
+      "name": "健身模块",
+      "short_name": "健身",
+      "url": "/#fitness"
+    }
+  ]
+}
