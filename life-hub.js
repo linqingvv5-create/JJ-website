@@ -1,80 +1,89 @@
 (function () {
   const STORAGE_KEY = "jj_life_hub_state_v1";
-  const LAST_PAGE_KEY = "jj_app_last_page_v1";
   const MODULE_KEYS = ["growth", "hobby", "money", "creator", "work"];
-  const MODULE_CONFIG = {
-    growth: {
-      icon: "🌱",
-      title: "成长",
-      subtitle: "读书·技能·复盘",
-      notePlaceholder: "随手记读书笔记、要学的技能、最近卡住的地方、想做的复盘题目。",
-      focusPlaceholder: "这两天最想推进什么？",
-      stepPlaceholder: "下一步只写一个最小动作",
-      taskPlaceholder: "加一条成长待办，比如：整理 3 条读书摘录",
-      tips: "先不用想完整系统，先把灵感和下一步存起来。"
-    },
-    hobby: {
-      icon: "🎨",
-      title: "兴趣",
-      subtitle: "手工·收藏·探索",
-      notePlaceholder: "记录灵感、材料清单、想做的东西、想买的器材、想去看的展。",
-      focusPlaceholder: "最近最想玩的兴趣方向",
-      stepPlaceholder: "下一步要买什么、做什么、试什么",
-      taskPlaceholder: "加一条兴趣待办，比如：查 2 个材料链接",
-      tips: "兴趣模块适合先堆想法，等你哪天想展开，我们再细化。"
-    },
-    money: {
-      icon: "💰",
-      title: "赚钱项目",
-      subtitle: "量化·副业·投资",
-      notePlaceholder: "这里写项目想法、收入目标、投资观察、想验证的新方向。",
-      focusPlaceholder: "当前最优先想推进的赚钱方向",
-      stepPlaceholder: "今天/明天能做的一步",
-      taskPlaceholder: "加一条赚钱待办，比如：整理一个副业方案",
-      tips: "交易看板继续管具体持仓，这里更适合放项目想法和副业推进。"
-    },
-    creator: {
-      icon: "📸",
-      title: "博主",
-      subtitle: "小红书·内容·涨粉",
-      notePlaceholder: "记选题、封面灵感、脚本碎片、最近的数据观察和内容方向。",
-      focusPlaceholder: "最近最想发的内容主题",
-      stepPlaceholder: "下一步：写提纲、拍素材还是发一条",
-      taskPlaceholder: "加一条内容待办，比如：列 5 个标题",
-      tips: "先把内容灵感全接住，后面我们再做内容日历和数据面板。"
-    },
-    work: {
-      icon: "💼",
-      title: "工作",
-      subtitle: "任务·日程·效率",
-      notePlaceholder: "记录今天要做的事、卡点、沟通提醒、临时灵感和流程优化。",
-      focusPlaceholder: "当前工作主线",
-      stepPlaceholder: "下一步先推进哪个动作",
-      taskPlaceholder: "加一条工作待办，比如：回一封关键邮件",
-      tips: "工作模块先做轻量待办，后面可以再接日程和流程模板。"
-    }
-  };
+  const IDEA_TAGS = ["fitness", ...MODULE_KEYS];
   const MODULE_PAGE_IDS = {
     growth: "pageGrowth",
     hobby: "pageHobby",
     money: "pageMoney",
     creator: "pageCreator",
-    work: "pageWork"
+    work: "pageWork",
   };
-  const MODULE_SELECTORS = {
-    growth: ".mod-card[onclick=\"navTo('growth')\"]",
-    hobby: ".mod-card[onclick=\"navTo('hobby')\"]",
-    money: ".mod-card[onclick=\"navTo('money')\"]",
-    creator: ".mod-card[onclick=\"navTo('creator')\"]",
-    work: ".mod-card[onclick=\"navTo('work')\"]"
+  const MODULE_CONFIG = {
+    fitness: {
+      icon: "💪",
+      title: "健身",
+      shortTitle: "健身",
+      subtitle: "训练、饮食、体态",
+    },
+    growth: {
+      icon: "🌱",
+      title: "成长",
+      shortTitle: "成长",
+      subtitle: "读书、技能、复盘",
+      focusPlaceholder: "最近最想推进什么？",
+      stepPlaceholder: "下一步先做哪一个最小动作",
+      notePlaceholder: "记录读书摘录、学习卡点、技能计划、复盘想法。",
+      taskPlaceholder: "加一条成长待办",
+      emptyText: "先写一句主线或加一条待办，后面我们再慢慢细化。",
+    },
+    hobby: {
+      icon: "🎨",
+      title: "兴趣",
+      shortTitle: "兴趣",
+      subtitle: "手工、收藏、探索",
+      focusPlaceholder: "最近最想玩的兴趣方向",
+      stepPlaceholder: "下一步准备做什么",
+      notePlaceholder: "记录灵感、材料清单、想买的器材、想去看的展。",
+      taskPlaceholder: "加一条兴趣待办",
+      emptyText: "这里适合先堆灵感，后面想展开的时候我们再拆细。",
+    },
+    money: {
+      icon: "💰",
+      title: "赚钱项目",
+      shortTitle: "赚钱",
+      subtitle: "量化、副业、投资",
+      focusPlaceholder: "当前最重要的赚钱方向",
+      stepPlaceholder: "今天或明天先推进哪一步",
+      notePlaceholder: "记录副业想法、收入目标、项目验证、投资观察。",
+      taskPlaceholder: "加一条赚钱待办",
+      emptyText: "交易看板管具体持仓，这里更适合放项目想法和副业推进。",
+    },
+    creator: {
+      icon: "📸",
+      title: "博主",
+      shortTitle: "博主",
+      subtitle: "内容、选题、涨粉",
+      focusPlaceholder: "最近最想发的内容主题",
+      stepPlaceholder: "下一步是写、拍还是发",
+      notePlaceholder: "记录选题、标题、脚本碎片、数据观察和内容方向。",
+      taskPlaceholder: "加一条内容待办",
+      emptyText: "先把内容灵感接住，后面再继续做日历和数据页。",
+    },
+    work: {
+      icon: "💼",
+      title: "工作",
+      shortTitle: "工作",
+      subtitle: "任务、日程、效率",
+      focusPlaceholder: "今天工作的主线是什么",
+      stepPlaceholder: "下一步先推进什么",
+      notePlaceholder: "记录待办、沟通提醒、卡点、临时想法和流程优化。",
+      taskPlaceholder: "加一条工作待办",
+      emptyText: "工作页先保持轻量，保证你打开就能马上记、马上勾。",
+    },
   };
 
+  const originalRenderHome = typeof window.renderHome === "function" ? window.renderHome : null;
+  const selectedIdeaTags = new Set();
+  const homeDraft = {
+    todayPlan: "",
+    ideaText: "",
+    ideaNote: "",
+  };
   const syncState = {
     mode: "checking",
     savedAt: "",
   };
-
-  const originalRenderHome = typeof window.renderHome === "function" ? window.renderHome : null;
 
   function injectStyles() {
     if (document.getElementById("lifeHubStyles")) {
@@ -84,170 +93,312 @@
     const style = document.createElement("style");
     style.id = "lifeHubStyles";
     style.textContent = `
+      html, body {
+        overflow-x: hidden;
+      }
+
       body {
         padding-top: env(safe-area-inset-top);
-        padding-bottom: calc(84px + env(safe-area-inset-bottom));
+        padding-bottom: calc(28px + env(safe-area-inset-bottom));
         overscroll-behavior-y: contain;
       }
 
+      .bottom-nav {
+        display: none !important;
+      }
+
       .home-header {
-        padding-top: calc(28px + env(safe-area-inset-top));
+        text-align: left;
+        padding: calc(22px + env(safe-area-inset-top)) 16px 6px;
+      }
+
+      .home-header .quote {
+        display: none;
       }
 
       .wake-btn {
-        margin-bottom: 14px;
+        display: none !important;
       }
 
-      .home-quickbar {
+      .home-dashboard {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-        padding: 0 16px 12px;
+        gap: 12px;
+        padding: 10px 16px 16px;
       }
 
-      .quick-action-card,
-      .home-focus-card,
+      .home-board-card,
       .life-module-panel,
       .life-module-hero,
-      .life-task-item {
+      .life-task-item,
+      .idea-item {
         border: 1px solid var(--bd);
-        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
       }
 
-      .quick-action-card {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        min-height: 92px;
-        padding: 14px;
+      .home-board-card,
+      .life-module-panel,
+      .life-module-hero {
         border-radius: 18px;
-        background: linear-gradient(135deg, rgba(24,24,36,0.98), rgba(17,17,26,0.98));
-        color: var(--txt);
-        text-decoration: none;
-        text-align: left;
+        background: linear-gradient(145deg, rgba(24, 24, 36, 0.98), rgba(14, 14, 22, 0.98));
       }
 
-      .quick-action-card strong {
-        font-size: 16px;
-      }
-
-      .quick-action-card span {
-        font-size: 12px;
-        color: var(--mt);
-      }
-
-      .quick-action-card.accent {
-        background: linear-gradient(135deg, rgba(24,48,86,0.98), rgba(16,27,47,0.98));
-        border-color: rgba(92, 201, 232, 0.32);
-      }
-
-      .home-focus-card {
-        margin: 0 16px 14px;
+      .home-board-card {
         padding: 16px;
-        border-radius: 18px;
-        background: linear-gradient(135deg, rgba(24,24,36,0.98), rgba(14,14,22,0.98));
       }
 
-      .home-focus-head {
+      .home-board-head,
+      .life-module-panel-head,
+      .life-module-hero-top {
         display: flex;
         justify-content: space-between;
         align-items: center;
         gap: 10px;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
       }
 
-      .home-focus-kicker {
+      .home-board-head h2,
+      .life-module-panel h2,
+      .life-module-hero h1 {
+        margin: 0;
+      }
+
+      .home-board-head h2,
+      .life-module-panel h2 {
+        font-size: 16px;
+      }
+
+      .home-board-meta,
+      .life-module-panel-head span,
+      .life-module-help,
+      .life-module-updated,
+      .life-module-hero p,
+      .today-plan-empty,
+      .idea-empty,
+      .home-helper {
+        color: var(--mt);
         font-size: 12px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--ac2);
+        line-height: 1.6;
       }
 
-      .home-focus-sync {
+      .home-sync-pill,
+      .life-module-sync {
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        min-height: 28px;
         padding: 5px 10px;
         border-radius: 999px;
-        background: rgba(92, 201, 232, 0.14);
-        color: var(--ac2);
         font-size: 11px;
         font-weight: 700;
+        white-space: nowrap;
+        background: rgba(92, 201, 232, 0.14);
+        color: var(--ac2);
       }
 
-      .home-focus-sync[data-sync-mode="online"] {
+      .home-sync-pill[data-sync-mode="online"],
+      .life-module-sync[data-sync-mode="online"] {
         background: rgba(62, 207, 142, 0.14);
         color: var(--done);
       }
 
-      .home-focus-sync[data-sync-mode="offline"] {
+      .home-sync-pill[data-sync-mode="offline"],
+      .life-module-sync[data-sync-mode="offline"] {
         background: rgba(245, 166, 35, 0.14);
         color: var(--warn);
       }
 
-      .home-focus-list {
+      .today-plan-creator,
+      .idea-creator {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .today-plan-input,
+      .idea-input,
+      .life-module-input,
+      .life-module-task-input,
+      .idea-notes-input,
+      .life-module-textarea {
+        width: 100%;
+        border: 1px solid var(--bd);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--txt);
+      }
+
+      .today-plan-input,
+      .idea-input,
+      .life-module-input,
+      .life-module-task-input {
+        min-height: 46px;
+        padding: 12px 14px;
+      }
+
+      .idea-notes-input,
+      .life-module-textarea {
+        min-height: 110px;
+        padding: 14px;
+        resize: vertical;
+      }
+
+      .today-plan-add,
+      .idea-add,
+      .life-module-task-button,
+      .life-module-primary-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 46px;
+        padding: 0 16px;
+        border: none;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #f0b050, #e8745c);
+        color: #fff;
+        font-size: 14px;
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+
+      .life-module-primary-link.money-link {
+        background: linear-gradient(135deg, #2563eb, #0f766e);
+      }
+
+      .idea-composer {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .tag-picker,
+      .idea-tag-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tag-chip {
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 999px;
+        border: 1px solid var(--bd);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--mt);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .tag-chip.is-selected {
+        background: rgba(92, 201, 232, 0.16);
+        border-color: rgba(92, 201, 232, 0.38);
+        color: var(--ac2);
+      }
+
+      .home-list,
+      .life-module-task-list,
+      .related-idea-list {
         display: grid;
         gap: 10px;
       }
 
-      .home-focus-row {
+      .life-task-item,
+      .idea-item {
         display: grid;
         grid-template-columns: auto 1fr auto;
-        align-items: center;
         gap: 10px;
-        padding: 12px 12px;
+        align-items: start;
+        padding: 12px;
         border-radius: 14px;
         background: rgba(255, 255, 255, 0.03);
       }
 
-      .home-focus-row strong {
+      .life-task-item.is-done,
+      .idea-item.is-done {
+        opacity: 0.68;
+      }
+
+      .life-task-toggle,
+      .idea-toggle {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2px solid var(--bd);
+        background: transparent;
+        color: #fff;
+        font-size: 11px;
+      }
+
+      .life-task-item.is-done .life-task-toggle,
+      .idea-item.is-done .idea-toggle {
+        border-color: var(--done);
+        background: var(--done);
+      }
+
+      .life-task-delete,
+      .idea-delete {
+        min-width: 34px;
+        min-height: 34px;
+        border-radius: 10px;
+        border: 1px solid var(--bd);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--mt);
+      }
+
+      .life-task-text,
+      .idea-text {
         font-size: 14px;
+        line-height: 1.5;
       }
 
-      .home-focus-row p {
-        margin: 2px 0 0;
-        font-size: 12px;
+      .life-task-item.is-done .life-task-text,
+      .idea-item.is-done .idea-text {
         color: var(--mt);
+        text-decoration: line-through;
       }
 
-      .home-focus-empty {
-        padding: 12px 0 2px;
-        font-size: 13px;
-        line-height: 1.6;
-        color: var(--mt);
+      .idea-text {
+        white-space: pre-wrap;
+        word-break: break-word;
       }
 
-      .home-focus-count {
-        min-width: 56px;
-        padding: 6px 8px;
-        border-radius: 999px;
-        background: rgba(232, 116, 92, 0.14);
-        color: var(--accent);
-        font-size: 11px;
-        font-weight: 700;
-        text-align: center;
-      }
-
-      .module-card-snapshot {
+      .idea-meta {
+        margin-top: 8px;
         display: grid;
-        gap: 6px;
-        margin-top: 14px;
+        gap: 8px;
       }
 
-      .module-card-badge {
+      .idea-notes {
+        font-size: 12px;
+        color: var(--mt);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .idea-meta-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .idea-time {
+        font-size: 11px;
+        color: var(--mt);
+      }
+
+      .idea-tag {
         display: inline-flex;
-        width: fit-content;
-        padding: 4px 8px;
+        align-items: center;
+        min-height: 28px;
+        padding: 0 10px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--txt);
         font-size: 11px;
         font-weight: 700;
-      }
-
-      .module-card-preview {
-        font-size: 12px;
-        line-height: 1.45;
-        opacity: 0.82;
       }
 
       .life-module-shell {
@@ -259,59 +410,21 @@
       }
 
       .life-module-hero {
-        padding: 20px 18px;
-        border-radius: 22px;
-        background: linear-gradient(145deg, rgba(25,25,39,0.98), rgba(13,13,20,0.98));
-        margin-bottom: 14px;
-      }
-
-      .life-module-hero h1 {
-        text-align: left;
-        padding: 0;
-        margin-bottom: 8px;
-      }
-
-      .life-module-hero p {
-        color: var(--mt);
-        line-height: 1.6;
-      }
-
-      .life-module-hero-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 10px;
+        padding: 18px;
+        margin-bottom: 12px;
       }
 
       .life-module-kicker {
         font-size: 12px;
         letter-spacing: 0.08em;
-        color: var(--ac3);
         text-transform: uppercase;
+        color: var(--ac3);
       }
 
-      .life-module-sync {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 28px;
-        padding: 5px 10px;
-        border-radius: 999px;
-        background: rgba(92, 201, 232, 0.14);
-        color: var(--ac2);
-        font-size: 11px;
-        font-weight: 700;
-      }
-
-      .life-module-sync[data-sync-mode="online"] {
-        background: rgba(62, 207, 142, 0.14);
-        color: var(--done);
-      }
-
-      .life-module-sync[data-sync-mode="offline"] {
-        background: rgba(245, 166, 35, 0.14);
-        color: var(--warn);
+      .life-module-hero h1 {
+        text-align: left;
+        padding: 0;
+        margin-bottom: 6px;
       }
 
       .life-module-grid {
@@ -325,150 +438,44 @@
         gap: 12px;
       }
 
-      .life-module-panel {
-        padding: 16px;
-        border-radius: 18px;
-        background: linear-gradient(145deg, rgba(24,24,36,0.98), rgba(14,14,22,0.98));
+      .module-simple-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: stretch;
       }
 
-      .life-module-panel h2 {
-        margin: 0;
-        font-size: 16px;
+      .module-simple-grid .mod-card {
+        min-height: 96px;
+        padding: 16px 14px;
       }
 
-      .life-module-panel-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 10px;
+      .module-simple-grid .mod-card .icon {
+        margin-bottom: 6px;
       }
 
-      .life-module-panel-head span,
-      .life-module-help,
-      .life-module-updated {
-        font-size: 12px;
-        color: var(--mt);
-      }
-
-      .life-module-input,
-      .life-module-textarea,
-      .life-module-task-input {
-        width: 100%;
-        border: 1px solid var(--bd);
-        border-radius: 14px;
-        background: rgba(255, 255, 255, 0.04);
-        color: var(--txt);
-      }
-
-      .life-module-input,
-      .life-module-task-input {
-        min-height: 48px;
-        padding: 12px 14px;
-      }
-
-      .life-module-textarea {
-        min-height: 136px;
-        padding: 14px;
-        resize: vertical;
-      }
-
-      .life-module-task-creator {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 10px;
-        margin-bottom: 12px;
-      }
-
-      .life-module-task-button,
-      .life-module-primary-link {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 46px;
-        padding: 0 16px;
-        border-radius: 14px;
-        border: none;
-        background: linear-gradient(135deg, #f0b050, #e8745c);
-        color: #fff;
-        font-size: 14px;
-        font-weight: 700;
-        text-decoration: none;
-      }
-
-      .life-module-primary-link.money-link {
-        background: linear-gradient(135deg, #2563eb, #0f766e);
-      }
-
-      .life-module-task-list {
-        display: grid;
-        gap: 10px;
-      }
-
-      .life-task-item {
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        gap: 10px;
-        align-items: center;
-        padding: 12px 12px;
-        border-radius: 14px;
-        background: rgba(255, 255, 255, 0.03);
-      }
-
-      .life-task-item.is-done {
-        opacity: 0.68;
-      }
-
-      .life-task-toggle {
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        border: 2px solid var(--bd);
-        background: transparent;
-        color: #fff;
+      .module-simple-grid .mod-card .sub {
+        margin-top: 2px;
         font-size: 11px;
       }
 
-      .life-task-item.is-done .life-task-toggle {
-        border-color: var(--done);
-        background: var(--done);
-      }
-
-      .life-task-text {
-        font-size: 14px;
-        line-height: 1.45;
-      }
-
-      .life-task-item.is-done .life-task-text {
-        text-decoration: line-through;
-        color: var(--mt);
-      }
-
-      .life-task-delete {
-        min-width: 34px;
-        min-height: 34px;
-        border-radius: 10px;
-        border: 1px solid var(--bd);
-        background: rgba(255, 255, 255, 0.04);
-        color: var(--mt);
-      }
-
-      .life-module-empty {
-        padding: 14px;
-        border-radius: 14px;
-        background: rgba(255, 255, 255, 0.03);
-        color: var(--mt);
-        font-size: 13px;
-        line-height: 1.6;
-      }
-
       @media (max-width: 760px) {
-        .grid {
+        .life-module-two-col {
           grid-template-columns: 1fr;
         }
 
-        .home-quickbar,
-        .life-module-two-col {
+        .today-plan-creator,
+        .idea-creator {
+          grid-template-columns: 1fr;
+        }
+
+        .today-plan-add,
+        .idea-add,
+        .life-module-task-button {
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 360px) {
+        .module-simple-grid {
           grid-template-columns: 1fr;
         }
       }
@@ -483,8 +490,21 @@
       nextStep: "",
       notes: "",
       tasks: [],
-      updatedAt: ""
+      updatedAt: "",
     };
+  }
+
+  function createDefaultState() {
+    const state = {
+      todayPlan: [],
+      ideas: [],
+    };
+
+    for (const moduleKey of MODULE_KEYS) {
+      state[moduleKey] = createEmptyModuleState();
+    }
+
+    return state;
   }
 
   function clone(value) {
@@ -502,31 +522,62 @@
 
   function normalizeTask(task) {
     const data = task && typeof task === "object" ? task : {};
+    const text = String(data.text || "").trim();
     return {
       id: String(data.id || "").trim() || `task-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      text: String(data.text || "").trim(),
-      done: Boolean(data.done)
+      text,
+      done: Boolean(data.done),
+      createdAt: String(data.createdAt || ""),
     };
   }
 
-  function normalizeModuleState(rawModuleState) {
-    const state = rawModuleState && typeof rawModuleState === "object" ? rawModuleState : {};
+  function normalizeIdea(idea) {
+    const data = idea && typeof idea === "object" ? idea : {};
+    const tags = Array.isArray(data.tags)
+      ? Array.from(new Set(data.tags.map((tag) => String(tag || "").trim()).filter((tag) => IDEA_TAGS.includes(tag))))
+      : [];
+
+    return {
+      id: String(data.id || "").trim() || `idea-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      text: String(data.text || "").trim(),
+      note: String(data.note || "").trim(),
+      tags,
+      done: Boolean(data.done),
+      createdAt: String(data.createdAt || ""),
+    };
+  }
+
+  function normalizeTaskList(tasks) {
+    return Array.isArray(tasks) ? tasks.map(normalizeTask).filter((task) => task.text) : [];
+  }
+
+  function normalizeIdeas(ideas) {
+    return Array.isArray(ideas) ? ideas.map(normalizeIdea).filter((idea) => idea.text) : [];
+  }
+
+  function normalizeModuleState(rawState) {
+    const state = rawState && typeof rawState === "object" ? rawState : {};
     return {
       focus: String(state.focus || ""),
       nextStep: String(state.nextStep || ""),
       notes: String(state.notes || ""),
-      tasks: Array.isArray(state.tasks) ? state.tasks.map(normalizeTask).filter((task) => task.text) : [],
-      updatedAt: String(state.updatedAt || "")
+      tasks: normalizeTaskList(state.tasks),
+      updatedAt: String(state.updatedAt || ""),
     };
   }
 
   function normalizeHubState(rawState) {
-    const state = rawState && typeof rawState === "object" ? rawState : {};
-    const nextState = {};
+    const data = rawState && typeof rawState === "object" ? rawState : {};
+    const state = createDefaultState();
+
+    state.todayPlan = normalizeTaskList(data.todayPlan);
+    state.ideas = normalizeIdeas(data.ideas);
+
     for (const moduleKey of MODULE_KEYS) {
-      nextState[moduleKey] = normalizeModuleState(state[moduleKey]);
+      state[moduleKey] = normalizeModuleState(data[moduleKey]);
     }
-    return nextState;
+
+    return state;
   }
 
   function loadHubState() {
@@ -534,7 +585,7 @@
       const raw = window.localStorage.getItem(STORAGE_KEY);
       return normalizeHubState(raw ? JSON.parse(raw) : null);
     } catch (error) {
-      return normalizeHubState(null);
+      return createDefaultState();
     }
   }
 
@@ -544,76 +595,239 @@
     return normalized;
   }
 
+  function updateHubState(updater, options) {
+    const nextOptions = options || {};
+    const currentState = loadHubState();
+    const nextState = normalizeHubState(updater(clone(currentState)) || currentState);
+    saveHubState(nextState);
+    refreshUI(nextOptions);
+    return nextState;
+  }
+
   function getModuleState(moduleKey) {
     return loadHubState()[moduleKey] || createEmptyModuleState();
   }
 
-  function updateVisibleModuleMeta(moduleKey) {
-    const visibleModule = getVisibleModuleKey();
-    if (visibleModule !== moduleKey) {
-      return;
+  function getSyncLabel() {
+    if (syncState.mode === "online") {
+      return {
+        mode: "online",
+        text: syncState.savedAt ? `云同步 ${syncState.savedAt.slice(11, 16)}` : "云同步已连接",
+      };
     }
 
-    const state = getModuleState(moduleKey);
-    const updatedNode = document.querySelector(`#${MODULE_PAGE_IDS[moduleKey]} .life-module-updated`);
-    if (updatedNode) {
-      updatedNode.textContent = formatModuleUpdatedAt(state.updatedAt);
+    if (syncState.mode === "offline") {
+      return {
+        mode: "offline",
+        text: "离线，先保存在本机",
+      };
     }
+
+    if (syncState.mode === "syncing") {
+      return {
+        mode: "syncing",
+        text: "正在同步",
+      };
+    }
+
+    return {
+      mode: "checking",
+      text: "自动保存中",
+    };
   }
 
-  function updateModuleState(moduleKey, updater, options) {
-    const nextOptions = options || {};
-    const hubState = loadHubState();
-    const currentState = clone(hubState[moduleKey] || createEmptyModuleState());
-    const nextModuleState = normalizeModuleState(updater(currentState) || currentState);
-    nextModuleState.updatedAt = new Date().toISOString();
-    hubState[moduleKey] = nextModuleState;
-    saveHubState(hubState);
-    refreshShell(moduleKey, nextOptions);
-    return nextModuleState;
-  }
-
-  function formatModuleUpdatedAt(value) {
+  function formatTimeLabel(value) {
     if (!value) {
-      return "还没开始写，随时可以先记一条。";
+      return "刚刚创建";
     }
 
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
-      return "内容已保存";
+      return "刚刚创建";
     }
 
-    const dateText = `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-    return `最近更新 ${dateText}`;
+    return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
   }
 
-  function countPendingTasks(moduleState) {
-    return (moduleState.tasks || []).filter((task) => !task.done).length;
-  }
-
-  function getModulePreview(moduleState) {
-    return moduleState.focus || moduleState.nextStep || moduleState.notes.split("\n").find(Boolean) || "还没有内容，先记一个下一步。";
-  }
-
-  function getLastVisitedPage() {
-    try {
-      return window.localStorage.getItem(LAST_PAGE_KEY) || "";
-    } catch (error) {
-      return "";
+  function formatModuleUpdatedAt(value) {
+    if (!value) {
+      return "还没开始写，先记一句当前主线就行。";
     }
+    return `最近更新 ${formatTimeLabel(value)}`;
   }
 
-  function setLastVisitedPage(page) {
-    try {
-      window.localStorage.setItem(LAST_PAGE_KEY, page);
-    } catch (error) {
+  function countPending(tasks) {
+    return (tasks || []).filter((task) => !task.done).length;
+  }
+
+  function getTaggedIdeas(tagKey) {
+    return loadHubState().ideas.filter((idea) => idea.tags.includes(tagKey));
+  }
+
+  function getVisibleModuleKey() {
+    return MODULE_KEYS.find((moduleKey) => {
+      const node = document.getElementById(MODULE_PAGE_IDS[moduleKey]);
+      return node && !node.classList.contains("hide");
+    }) || "";
+  }
+
+  function isHomeVisible() {
+    const node = document.getElementById("pageHome");
+    return Boolean(node && !node.classList.contains("hide"));
+  }
+
+  function ensureHomeNodes() {
+    const header = document.querySelector(".home-header");
+    const grid = document.querySelector(".grid");
+    if (!header || !grid) {
+      return {};
+    }
+
+    grid.classList.add("module-simple-grid");
+
+    let dashboard = document.getElementById("homeDashboard");
+    if (!dashboard) {
+      dashboard = document.createElement("div");
+      dashboard.id = "homeDashboard";
+      dashboard.className = "home-dashboard";
+    }
+
+    if (grid.nextElementSibling !== dashboard) {
+      grid.insertAdjacentElement("afterend", dashboard);
+    }
+
+    return { dashboard, grid };
+  }
+
+  function renderTodayPlanSection(tasks) {
+    const syncLabel = getSyncLabel();
+    const sortedTasks = [...tasks].sort((left, right) => Number(left.done) - Number(right.done));
+
+    return `
+      <section class="home-board-card">
+        <div class="home-board-head">
+          <div>
+            <h2>今日安排</h2>
+            <div class="home-board-meta">${countPending(tasks) ? `${countPending(tasks)} 项待完成` : "今天想做的事先记在这里"}</div>
+          </div>
+          <span class="home-sync-pill" data-lifehub-sync-status data-sync-mode="${escapeHtml(syncLabel.mode)}">${escapeHtml(syncLabel.text)}</span>
+        </div>
+        <div class="today-plan-creator">
+          <input class="today-plan-input" type="text" id="todayPlanInput" placeholder="加一条今天要做的事" value="${escapeHtml(homeDraft.todayPlan)}">
+          <button class="today-plan-add" type="button" data-home-action="add-today-plan">添加</button>
+        </div>
+        <div class="home-list">
+          ${sortedTasks.length ? sortedTasks.map((task) => `
+            <div class="life-task-item${task.done ? " is-done" : ""}">
+              <button class="life-task-toggle" type="button" data-home-action="toggle-today-plan" data-item-id="${escapeHtml(task.id)}">${task.done ? "✓" : ""}</button>
+              <div class="life-task-text">${escapeHtml(task.text)}</div>
+              <button class="life-task-delete" type="button" data-home-action="delete-today-plan" data-item-id="${escapeHtml(task.id)}">✕</button>
+            </div>
+          `).join("") : `
+            <div class="today-plan-empty">不用复杂计划，想到什么就先写一条，完成后直接打勾。</div>
+          `}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderIdeaItem(idea, contextTag) {
+    const displayTags = idea.tags.map((tag) => MODULE_CONFIG[tag]).filter(Boolean);
+    return `
+      <div class="idea-item${idea.done ? " is-done" : ""}">
+        <button class="idea-toggle" type="button" data-home-action="toggle-idea" data-item-id="${escapeHtml(idea.id)}">${idea.done ? "✓" : ""}</button>
+        <div>
+          <div class="idea-text">${escapeHtml(idea.text)}</div>
+          <div class="idea-meta">
+            ${idea.note ? `<div class="idea-notes">${escapeHtml(idea.note)}</div>` : ""}
+            <div class="idea-meta-bar">
+              <div class="idea-tag-list">
+                ${displayTags.map((tag) => `
+                  <span class="idea-tag">${tag.icon} ${tag.shortTitle}</span>
+                `).join("")}
+              </div>
+              <div class="idea-time">${contextTag ? `归档到 ${MODULE_CONFIG[contextTag].title}` : formatTimeLabel(idea.createdAt)}</div>
+            </div>
+          </div>
+        </div>
+        <button class="idea-delete" type="button" data-home-action="delete-idea" data-item-id="${escapeHtml(idea.id)}">✕</button>
+      </div>
+    `;
+  }
+
+  function renderIdeaSection(ideas) {
+    const pendingCount = countPending(ideas);
+    const selectedTags = IDEA_TAGS.filter((tag) => selectedIdeaTags.has(tag));
+
+    return `
+      <section class="home-board-card">
+        <div class="home-board-head">
+          <div>
+            <h2>灵感随记</h2>
+            <div class="home-board-meta">${pendingCount ? `${pendingCount} 条还在推进` : "想到就记，后面再慢慢整理"}</div>
+          </div>
+        </div>
+
+        <div class="idea-composer">
+          <input class="idea-input" type="text" id="ideaTextInput" placeholder="一句话先记下来" value="${escapeHtml(homeDraft.ideaText)}">
+          <textarea class="idea-notes-input" id="ideaNoteInput" placeholder="补充一点背景、步骤、细节也行（可空）">${escapeHtml(homeDraft.ideaNote)}</textarea>
+          <div class="tag-picker">
+            ${IDEA_TAGS.map((tag) => `
+              <button
+                class="tag-chip${selectedIdeaTags.has(tag) ? " is-selected" : ""}"
+                type="button"
+                data-home-action="toggle-idea-tag"
+                data-tag="${tag}"
+              >${MODULE_CONFIG[tag].icon} ${MODULE_CONFIG[tag].shortTitle}</button>
+            `).join("")}
+          </div>
+          <div class="home-helper">可以多选标签。比如同一条灵感，同时归到健身和博主。</div>
+          <div class="idea-creator">
+            <div class="home-helper">${selectedTags.length ? `当前标签：${selectedTags.map((tag) => MODULE_CONFIG[tag].shortTitle).join("、")}` : "至少选一个标签再保存"}</div>
+            <button class="idea-add" type="button" data-home-action="add-idea">保存灵感</button>
+          </div>
+        </div>
+
+        <div class="home-list">
+          ${ideas.length ? ideas.map((idea) => renderIdeaItem(idea, "")).join("") : `
+            <div class="idea-empty">这里就是你的收纳盒。先把念头放进来，后面再决定放到哪个模块慢慢做。</div>
+          `}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderHomeEnhancements() {
+    const { dashboard } = ensureHomeNodes();
+    if (!dashboard) {
       return;
     }
+
+    const state = loadHubState();
+    const sortedIdeas = [...state.ideas].sort((left, right) => Number(left.done) - Number(right.done));
+
+    dashboard.innerHTML = `
+      ${renderTodayPlanSection(state.todayPlan)}
+      ${renderIdeaSection(sortedIdeas)}
+    `;
   }
 
-  function setHashForPage(page) {
-    const nextUrl = page && page !== "home" ? `#${page}` : window.location.pathname;
-    window.history.replaceState(null, "", nextUrl);
+  function renderRelatedIdeasSection(moduleKey) {
+    const ideas = getTaggedIdeas(moduleKey).sort((left, right) => Number(left.done) - Number(right.done));
+
+    return `
+      <section class="life-module-panel">
+        <div class="life-module-panel-head">
+          <h2>关联灵感</h2>
+          <span>${ideas.length ? `${countPending(ideas)} 条还在推进` : "还没有归档到这里的灵感"}</span>
+        </div>
+        <div class="related-idea-list">
+          ${ideas.length ? ideas.map((idea) => renderIdeaItem(idea, moduleKey)).join("") : `
+            <div class="idea-empty">回首页的“灵感随记”里写下来，再勾选这个模块标签，这里就会自动出现。</div>
+          `}
+        </div>
+      </section>
+    `;
   }
 
   function renderModulePage(moduleKey) {
@@ -624,8 +838,8 @@
     }
 
     const moduleState = getModuleState(moduleKey);
-    const pendingCount = countPendingTasks(moduleState);
     const syncLabel = getSyncLabel();
+    const pendingCount = countPending(moduleState.tasks);
 
     host.innerHTML = `
       <div class="life-module-shell">
@@ -633,7 +847,7 @@
         <div class="page">
           <section class="life-module-hero">
             <div class="life-module-hero-top">
-              <span class="life-module-kicker">Module Workspace</span>
+              <span class="life-module-kicker">Simple Workspace</span>
               <span class="life-module-sync" data-lifehub-sync-status data-sync-mode="${escapeHtml(syncLabel.mode)}">${escapeHtml(syncLabel.text)}</span>
             </div>
             <h1>${config.icon} ${config.title}</h1>
@@ -642,12 +856,11 @@
           </section>
 
           ${moduleKey === "money" ? `
-            <section class="life-module-panel" style="margin-bottom:12px;">
+            <section class="life-module-panel">
               <div class="life-module-panel-head">
                 <h2>交易看板</h2>
-                <span>手机上也能直接打开</span>
+                <span>账户和持仓继续在这里维护</span>
               </div>
-              <p class="life-module-help" style="margin-bottom:12px;">具体持仓、计划和账户继续放在交易看板，这里用来记赚钱方向和副业推进。</p>
               <a class="life-module-primary-link money-link" href="finance.html">打开交易看板</a>
             </section>
           ` : ""}
@@ -657,7 +870,7 @@
               <section class="life-module-panel">
                 <div class="life-module-panel-head">
                   <h2>当前主线</h2>
-                  <span>打开就先看这里</span>
+                  <span>打开先看这句</span>
                 </div>
                 <input
                   class="life-module-input"
@@ -671,7 +884,7 @@
 
               <section class="life-module-panel">
                 <div class="life-module-panel-head">
-                  <h2>下一步动作</h2>
+                  <h2>下一步</h2>
                   <span>尽量写小一点</span>
                 </div>
                 <input
@@ -687,8 +900,8 @@
 
             <section class="life-module-panel">
               <div class="life-module-panel-head">
-                <h2>灵感和想法</h2>
-                <span>自动云同步</span>
+                <h2>模块笔记</h2>
+                <span>自动保存</span>
               </div>
               <textarea
                 class="life-module-textarea"
@@ -696,15 +909,15 @@
                 data-lifehub-field="notes"
                 placeholder="${escapeHtml(config.notePlaceholder)}"
               >${escapeHtml(moduleState.notes)}</textarea>
-              <p class="life-module-help" style="margin-top:10px;">${config.tips}</p>
+              <p class="life-module-help" style="margin-top:10px;">${config.emptyText}</p>
             </section>
 
             <section class="life-module-panel">
               <div class="life-module-panel-head">
-                <h2>随手待办</h2>
+                <h2>模块待办</h2>
                 <span>${pendingCount ? `${pendingCount} 项未完成` : "空着也没关系"}</span>
               </div>
-              <div class="life-module-task-creator">
+              <div class="today-plan-creator">
                 <input
                   class="life-module-task-input"
                   type="text"
@@ -714,200 +927,395 @@
                 <button class="life-module-task-button" type="button" data-lifehub-add-task="${moduleKey}">添加</button>
               </div>
               <div class="life-module-task-list">
-                ${renderTaskList(moduleKey, moduleState.tasks)}
+                ${moduleState.tasks.length ? [...moduleState.tasks].sort((left, right) => Number(left.done) - Number(right.done)).map((task) => `
+                  <div class="life-task-item${task.done ? " is-done" : ""}">
+                    <button class="life-task-toggle" type="button" data-lifehub-toggle-task="${moduleKey}" data-item-id="${escapeHtml(task.id)}">${task.done ? "✓" : ""}</button>
+                    <div class="life-task-text">${escapeHtml(task.text)}</div>
+                    <button class="life-task-delete" type="button" data-lifehub-delete-task="${moduleKey}" data-item-id="${escapeHtml(task.id)}">✕</button>
+                  </div>
+                `).join("") : `
+                  <div class="today-plan-empty">${config.emptyText}</div>
+                `}
               </div>
             </section>
+
+            ${renderRelatedIdeasSection(moduleKey)}
           </div>
         </div>
       </div>
     `;
   }
 
-  function renderTaskList(moduleKey, tasks) {
-    if (!tasks.length) {
-      return `<div class="life-module-empty">这里先空着也没问题。你有想法时，随手丢一条进来，手机和电脑会一起同步。</div>`;
+  function ensureFitnessIdeaPanel() {
+    const page = document.getElementById("pageFitness");
+    if (!page) {
+      return null;
     }
 
-    return tasks.map((task) => `
-      <div class="life-task-item${task.done ? " is-done" : ""}">
-        <button class="life-task-toggle" type="button" data-lifehub-toggle-task="${moduleKey}" data-task-id="${escapeHtml(task.id)}">${task.done ? "✓" : ""}</button>
-        <div class="life-task-text">${escapeHtml(task.text)}</div>
-        <button class="life-task-delete" type="button" data-lifehub-delete-task="${moduleKey}" data-task-id="${escapeHtml(task.id)}">✕</button>
-      </div>
-    `).join("");
+    let panel = document.getElementById("fitnessIdeaPanel");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.id = "fitnessIdeaPanel";
+      panel.className = "page";
+      page.appendChild(panel);
+    }
+
+    return panel;
   }
 
-  function ensureHomeExtensionNodes() {
-    const wakeButton = document.getElementById("wakeBtn");
-    const grid = document.querySelector(".grid");
-    if (!wakeButton || !grid) {
-      return {};
-    }
-
-    let quickBar = document.getElementById("homeQuickBar");
-    if (!quickBar) {
-      quickBar = document.createElement("div");
-      quickBar.id = "homeQuickBar";
-      quickBar.className = "home-quickbar";
-      grid.parentNode.insertBefore(quickBar, grid);
-    }
-
-    let focusCard = document.getElementById("homeFocusCard");
-    if (!focusCard) {
-      focusCard = document.createElement("div");
-      focusCard.id = "homeFocusCard";
-      focusCard.className = "home-focus-card";
-      grid.parentNode.insertBefore(focusCard, grid);
-    }
-
-    return { quickBar, focusCard };
-  }
-
-  function renderHomeQuickBar(target) {
-    const lastPage = getLastVisitedPage();
-    const lastConfig = MODULE_CONFIG[lastPage];
-    const lastModuleState = lastConfig ? getModuleState(lastPage) : null;
-    const lastLabel = lastConfig ? `${lastConfig.icon} ${lastConfig.title}` : "💪 健身";
-    const lastHint = lastConfig
-      ? (lastModuleState.nextStep || lastModuleState.focus || `${countPendingTasks(lastModuleState)} 项待办`)
-      : "回到最近打开的模块";
-
-    target.innerHTML = `
-      <button class="quick-action-card" type="button" data-lifehub-open-last>
-        <strong>继续上次</strong>
-        <div>${escapeHtml(lastLabel)}</div>
-        <span>${escapeHtml(lastHint)}</span>
-      </button>
-      <a class="quick-action-card accent" href="finance.html">
-        <strong>打开交易看板</strong>
-        <div>资金、持仓、计划</div>
-        <span>理财数据继续在独立看板维护</span>
-      </a>
-    `;
-  }
-
-  function getSyncLabel() {
-    if (syncState.mode === "online") {
-      return {
-        mode: "online",
-        text: syncState.savedAt ? `云同步已连上 · ${syncState.savedAt.slice(11, 16)}` : "云同步已连接"
-      };
-    }
-
-    if (syncState.mode === "offline") {
-      return {
-        mode: "offline",
-        text: "离线中，先保存在本机"
-      };
-    }
-
-    if (syncState.mode === "syncing") {
-      return {
-        mode: "syncing",
-        text: "正在同步..."
-      };
-    }
-
-    return {
-      mode: "checking",
-      text: "自动保存已开启"
-    };
-  }
-
-  function buildFocusRows() {
-    return MODULE_KEYS
-      .map((moduleKey) => {
-        const config = MODULE_CONFIG[moduleKey];
-        const moduleState = getModuleState(moduleKey);
-        const preview = moduleState.focus || moduleState.nextStep || moduleState.notes.split("\n").find(Boolean) || "";
-        const pendingCount = countPendingTasks(moduleState);
-        return {
-          moduleKey,
-          icon: config.icon,
-          title: config.title,
-          preview,
-          pendingCount
-        };
-      })
-      .filter((item) => item.preview || item.pendingCount)
-      .sort((left, right) => right.pendingCount - left.pendingCount || left.title.localeCompare(right.title));
-  }
-
-  function renderHomeFocusCard(target) {
-    const rows = buildFocusRows().slice(0, 4);
-    const syncLabel = getSyncLabel();
-
-    target.innerHTML = `
-      <div class="home-focus-head">
-        <div>
-          <div class="home-focus-kicker">Today Board</div>
-          <strong>今天先推进这些</strong>
-        </div>
-        <span class="home-focus-sync" data-lifehub-sync-status data-sync-mode="${escapeHtml(syncLabel.mode)}">${escapeHtml(syncLabel.text)}</span>
-      </div>
-      <div class="home-focus-list">
-        ${rows.length ? rows.map((row) => `
-          <button class="home-focus-row" type="button" data-lifehub-open-module="${row.moduleKey}">
-            <div style="font-size:24px;">${row.icon}</div>
-            <div style="text-align:left;">
-              <strong>${row.title}</strong>
-              <p>${escapeHtml(row.preview || "先写一句当前主线")}</p>
-            </div>
-            <div class="home-focus-count">${row.pendingCount ? `${row.pendingCount} 待办` : "已开工"}</div>
-          </button>
-        `).join("") : `
-          <div class="home-focus-empty">
-            这 5 个模块已经接上云同步了。<br>
-            你现在随便点一个模块，先写一句“当前主线”或“下一步动作”，这里就会自动汇总。
-          </div>
-        `}
-      </div>
-    `;
-  }
-
-  function renderModuleCardSnapshots() {
-    for (const moduleKey of MODULE_KEYS) {
-      const card = document.querySelector(MODULE_SELECTORS[moduleKey]);
-      if (!card) {
-        continue;
-      }
-
-      let snapshot = card.querySelector(".module-card-snapshot");
-      if (!snapshot) {
-        snapshot = document.createElement("div");
-        snapshot.className = "module-card-snapshot";
-        card.appendChild(snapshot);
-      }
-
-      const moduleState = getModuleState(moduleKey);
-      const pendingCount = countPendingTasks(moduleState);
-      const preview = getModulePreview(moduleState);
-
-      snapshot.innerHTML = `
-        <span class="module-card-badge">${pendingCount ? `${pendingCount} 项待办` : "云同步已开"}</span>
-        <div class="module-card-preview">${escapeHtml(preview)}</div>
-      `;
-    }
-  }
-
-  function renderHomeEnhancements() {
-    const { quickBar, focusCard } = ensureHomeExtensionNodes();
-    if (!quickBar || !focusCard) {
+  function renderFitnessIdeaPanel() {
+    const panel = ensureFitnessIdeaPanel();
+    if (!panel) {
       return;
     }
 
-    renderHomeQuickBar(quickBar);
-    renderHomeFocusCard(focusCard);
-    renderModuleCardSnapshots();
-    updateSyncBadges();
+    const ideas = getTaggedIdeas("fitness").sort((left, right) => Number(left.done) - Number(right.done));
+    panel.innerHTML = `
+      <section class="life-module-panel" style="margin-top:12px;">
+        <div class="life-module-panel-head">
+          <h2>健身灵感</h2>
+          <span>${ideas.length ? `${countPending(ideas)} 条还在推进` : "还没有关联到健身的灵感"}</span>
+        </div>
+        <div class="related-idea-list">
+          ${ideas.length ? ideas.map((idea) => renderIdeaItem(idea, "fitness")).join("") : `
+            <div class="idea-empty">首页“灵感随记”里勾选健身标签，这里就会自动同步出现。</div>
+          `}
+        </div>
+      </section>
+    `;
   }
 
-  function updateSyncBadges() {
+  function refreshSyncBadges() {
     const syncLabel = getSyncLabel();
     document.querySelectorAll("[data-lifehub-sync-status]").forEach((node) => {
       node.textContent = syncLabel.text;
       node.dataset.syncMode = syncLabel.mode;
     });
+  }
+
+  function refreshUI(options) {
+    const nextOptions = options || {};
+    if (!nextOptions.skipHome && isHomeVisible()) {
+      renderHomeEnhancements();
+    }
+
+    const visibleModule = getVisibleModuleKey();
+    if (visibleModule && !nextOptions.skipModuleRender) {
+      renderModulePage(visibleModule);
+    }
+
+    const fitnessVisible = document.getElementById("pageFitness") && !document.getElementById("pageFitness").classList.contains("hide");
+    if (fitnessVisible || nextOptions.refreshFitnessPanel) {
+      renderFitnessIdeaPanel();
+    }
+
+    refreshSyncBadges();
+  }
+
+  function toggleSelectedIdeaTag(tag) {
+    if (selectedIdeaTags.has(tag)) {
+      selectedIdeaTags.delete(tag);
+    } else {
+      selectedIdeaTags.add(tag);
+    }
+
+    if (isHomeVisible()) {
+      renderHomeEnhancements();
+    }
+  }
+
+  function addTodayPlan() {
+    const input = document.getElementById("todayPlanInput");
+    if (!input) {
+      return;
+    }
+
+    const text = input.value.trim();
+    if (!text) {
+      input.focus();
+      return;
+    }
+
+    updateHubState((state) => {
+      state.todayPlan.unshift({
+        id: `today-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        text,
+        done: false,
+        createdAt: new Date().toISOString(),
+      });
+      return state;
+    }, {
+      refreshFitnessPanel: true,
+    });
+    homeDraft.todayPlan = "";
+  }
+
+  function addIdea() {
+    const textInput = document.getElementById("ideaTextInput");
+    const noteInput = document.getElementById("ideaNoteInput");
+    if (!textInput || !noteInput) {
+      return;
+    }
+
+    const text = textInput.value.trim();
+    if (!text) {
+      textInput.focus();
+      return;
+    }
+
+    const tags = IDEA_TAGS.filter((tag) => selectedIdeaTags.has(tag));
+    if (!tags.length) {
+      window.alert("至少选一个标签再保存。");
+      return;
+    }
+
+    updateHubState((state) => {
+      state.ideas.unshift({
+        id: `idea-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        text,
+        note: noteInput.value.trim(),
+        tags,
+        done: false,
+        createdAt: new Date().toISOString(),
+      });
+      return state;
+    }, {
+      refreshFitnessPanel: tags.includes("fitness"),
+    });
+    homeDraft.ideaText = "";
+    homeDraft.ideaNote = "";
+  }
+
+  function addModuleTask(moduleKey) {
+    const input = document.querySelector(`[data-lifehub-new-task="${moduleKey}"]`);
+    if (!input) {
+      return;
+    }
+
+    const text = input.value.trim();
+    if (!text) {
+      input.focus();
+      return;
+    }
+
+    updateHubState((state) => {
+      state[moduleKey].tasks.unshift({
+        id: `module-task-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        text,
+        done: false,
+        createdAt: new Date().toISOString(),
+      });
+      state[moduleKey].updatedAt = new Date().toISOString();
+      return state;
+    });
+  }
+
+  function handleModuleInput(event) {
+    if (event.target.id === "todayPlanInput") {
+      homeDraft.todayPlan = event.target.value;
+      return;
+    }
+
+    if (event.target.id === "ideaTextInput") {
+      homeDraft.ideaText = event.target.value;
+      return;
+    }
+
+    if (event.target.id === "ideaNoteInput") {
+      homeDraft.ideaNote = event.target.value;
+      return;
+    }
+
+    const field = event.target.closest("[data-lifehub-field]");
+    if (!field) {
+      return;
+    }
+
+    const moduleKey = field.dataset.lifehubModule;
+    const property = field.dataset.lifehubField;
+    if (!MODULE_KEYS.includes(moduleKey) || !property) {
+      return;
+    }
+
+    updateHubState((state) => {
+      state[moduleKey][property] = field.value;
+      state[moduleKey].updatedAt = new Date().toISOString();
+      return state;
+    }, {
+      skipModuleRender: true,
+      refreshFitnessPanel: moduleKey === "fitness",
+    });
+  }
+
+  function handleHomeAction(action, itemId, tag) {
+    if (action === "add-today-plan") {
+      addTodayPlan();
+      return;
+    }
+
+    if (action === "add-idea") {
+      addIdea();
+      return;
+    }
+
+    if (action === "toggle-idea-tag" && tag) {
+      toggleSelectedIdeaTag(tag);
+      return;
+    }
+
+    if (action === "toggle-today-plan" && itemId) {
+      updateHubState((state) => {
+        state.todayPlan = state.todayPlan.map((task) => task.id === itemId ? { ...task, done: !task.done } : task);
+        return state;
+      });
+      return;
+    }
+
+    if (action === "delete-today-plan" && itemId) {
+      updateHubState((state) => {
+        state.todayPlan = state.todayPlan.filter((task) => task.id !== itemId);
+        return state;
+      });
+      return;
+    }
+
+    if (action === "toggle-idea" && itemId) {
+      updateHubState((state) => {
+        state.ideas = state.ideas.map((idea) => idea.id === itemId ? { ...idea, done: !idea.done } : idea);
+        return state;
+      }, {
+        refreshFitnessPanel: true,
+      });
+      return;
+    }
+
+    if (action === "delete-idea" && itemId) {
+      updateHubState((state) => {
+        state.ideas = state.ideas.filter((idea) => idea.id !== itemId);
+        return state;
+      }, {
+        refreshFitnessPanel: true,
+      });
+    }
+  }
+
+  function handleTaskAction(action, moduleKey, itemId) {
+    if (!MODULE_KEYS.includes(moduleKey)) {
+      return;
+    }
+
+    if (action === "add-task") {
+      addModuleTask(moduleKey);
+      return;
+    }
+
+    if (action === "toggle-task" && itemId) {
+      updateHubState((state) => {
+        state[moduleKey].tasks = state[moduleKey].tasks.map((task) => task.id === itemId ? { ...task, done: !task.done } : task);
+        state[moduleKey].updatedAt = new Date().toISOString();
+        return state;
+      });
+      return;
+    }
+
+    if (action === "delete-task" && itemId) {
+      updateHubState((state) => {
+        state[moduleKey].tasks = state[moduleKey].tasks.filter((task) => task.id !== itemId);
+        state[moduleKey].updatedAt = new Date().toISOString();
+        return state;
+      });
+    }
+  }
+
+  function handleClick(event) {
+    const actionNode = event.target.closest("[data-home-action]");
+    if (actionNode) {
+      handleHomeAction(
+        actionNode.dataset.homeAction,
+        actionNode.dataset.itemId,
+        actionNode.dataset.tag
+      );
+      return;
+    }
+
+    const openModuleNode = event.target.closest("[data-home-open-module]");
+    if (openModuleNode) {
+      window.navTo(openModuleNode.dataset.homeOpenModule);
+      return;
+    }
+
+    const addTaskNode = event.target.closest("[data-lifehub-add-task]");
+    if (addTaskNode) {
+      handleTaskAction("add-task", addTaskNode.dataset.lifehubAddTask, "");
+      return;
+    }
+
+    const toggleTaskNode = event.target.closest("[data-lifehub-toggle-task]");
+    if (toggleTaskNode) {
+      handleTaskAction("toggle-task", toggleTaskNode.dataset.lifehubToggleTask, toggleTaskNode.dataset.itemId);
+      return;
+    }
+
+    const deleteTaskNode = event.target.closest("[data-lifehub-delete-task]");
+    if (deleteTaskNode) {
+      handleTaskAction("delete-task", deleteTaskNode.dataset.lifehubDeleteTask, deleteTaskNode.dataset.itemId);
+    }
+  }
+
+  function handleKeydown(event) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    const todayInput = event.target.closest("#todayPlanInput");
+    if (todayInput) {
+      event.preventDefault();
+      addTodayPlan();
+      return;
+    }
+
+    const ideaInput = event.target.closest("#ideaTextInput");
+    if (ideaInput) {
+      event.preventDefault();
+      addIdea();
+      return;
+    }
+
+    const moduleInput = event.target.closest("[data-lifehub-new-task]");
+    if (moduleInput) {
+      event.preventDefault();
+      addModuleTask(moduleInput.dataset.lifehubNewTask);
+    }
+  }
+
+  function handleStorage(event) {
+    if (event.key !== STORAGE_KEY) {
+      return;
+    }
+
+    refreshUI({
+      refreshFitnessPanel: true,
+    });
+  }
+
+  function handleSyncStatus(event) {
+    const detail = event.detail || {};
+    syncState.mode = String(detail.mode || "checking");
+    syncState.savedAt = String(detail.savedAt || "");
+    refreshSyncBadges();
+  }
+
+  function handleRemoteStateUpdate() {
+    refreshUI({
+      refreshFitnessPanel: true,
+    });
+  }
+
+  function renderHome() {
+    if (originalRenderHome) {
+      originalRenderHome();
+    }
+    renderHomeEnhancements();
   }
 
   function showPage(page) {
@@ -931,14 +1339,19 @@
       button.classList.toggle("active", button.dataset.page === page || (page === "home" && button.dataset.page === "home"));
     });
 
-    if (page === "home" && originalRenderHome) {
-      originalRenderHome();
-      renderHomeEnhancements();
+    if (page === "home") {
+      renderHome();
+      return;
+    }
+
+    if (page === "money") {
+      window.location.href = "finance.html";
       return;
     }
 
     if (page === "fitness" && typeof window.renderFitness === "function") {
       window.renderFitness();
+      renderFitnessIdeaPanel();
       return;
     }
 
@@ -957,180 +1370,9 @@
     }
   }
 
-  function refreshShell(moduleKey, options) {
-    const nextOptions = options || {};
-    const visibleModule = getVisibleModuleKey();
-    if (moduleKey && visibleModule === moduleKey && nextOptions.rerenderCurrentModule !== false) {
-      renderModulePage(moduleKey);
-    } else if (moduleKey) {
-      updateVisibleModuleMeta(moduleKey);
-    }
-
-    if (isHomeVisible()) {
-      renderHomeEnhancements();
-    } else {
-      renderModuleCardSnapshots();
-      updateSyncBadges();
-    }
-  }
-
-  function getVisibleModuleKey() {
-    return MODULE_KEYS.find((moduleKey) => {
-      const node = document.getElementById(MODULE_PAGE_IDS[moduleKey]);
-      return node && !node.classList.contains("hide");
-    }) || "";
-  }
-
-  function isHomeVisible() {
-    const pageHome = document.getElementById("pageHome");
-    return Boolean(pageHome && !pageHome.classList.contains("hide"));
-  }
-
-  function openLastPage() {
-    const lastPage = getLastVisitedPage();
-    const nextPage = lastPage || "fitness";
-    window.navTo(nextPage);
-  }
-
-  function addTask(moduleKey) {
-    const input = document.querySelector(`[data-lifehub-new-task="${moduleKey}"]`);
-    if (!input) {
-      return;
-    }
-
-    const text = input.value.trim();
-    if (!text) {
-      input.focus();
-      return;
-    }
-
-    updateModuleState(moduleKey, (moduleState) => {
-      moduleState.tasks.unshift({
-        id: `task-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-        text,
-        done: false
-      });
-      return moduleState;
-    });
-  }
-
-  function handleInput(event) {
-    const field = event.target.closest("[data-lifehub-field]");
-    if (!field) {
-      return;
-    }
-
-    const moduleKey = field.dataset.lifehubModule;
-    const property = field.dataset.lifehubField;
-    if (!MODULE_KEYS.includes(moduleKey) || !property) {
-      return;
-    }
-
-    updateModuleState(moduleKey, (moduleState) => {
-      moduleState[property] = field.value;
-      return moduleState;
-    }, {
-      rerenderCurrentModule: false
-    });
-  }
-
-  function handleClick(event) {
-    const openLastButton = event.target.closest("[data-lifehub-open-last]");
-    if (openLastButton) {
-      openLastPage();
-      return;
-    }
-
-    const openModuleButton = event.target.closest("[data-lifehub-open-module]");
-    if (openModuleButton) {
-      window.navTo(openModuleButton.dataset.lifehubOpenModule);
-      return;
-    }
-
-    const addTaskButton = event.target.closest("[data-lifehub-add-task]");
-    if (addTaskButton) {
-      addTask(addTaskButton.dataset.lifehubAddTask);
-      return;
-    }
-
-    const toggleTaskButton = event.target.closest("[data-lifehub-toggle-task]");
-    if (toggleTaskButton) {
-      const moduleKey = toggleTaskButton.dataset.lifehubToggleTask;
-      const taskId = toggleTaskButton.dataset.taskId;
-      updateModuleState(moduleKey, (moduleState) => {
-        moduleState.tasks = moduleState.tasks.map((task) => {
-          if (task.id !== taskId) {
-            return task;
-          }
-          return {
-            ...task,
-            done: !task.done
-          };
-        });
-        return moduleState;
-      });
-      return;
-    }
-
-    const deleteTaskButton = event.target.closest("[data-lifehub-delete-task]");
-    if (deleteTaskButton) {
-      const moduleKey = deleteTaskButton.dataset.lifehubDeleteTask;
-      const taskId = deleteTaskButton.dataset.taskId;
-      updateModuleState(moduleKey, (moduleState) => {
-        moduleState.tasks = moduleState.tasks.filter((task) => task.id !== taskId);
-        return moduleState;
-      });
-    }
-  }
-
-  function handleKeydown(event) {
-    const input = event.target.closest("[data-lifehub-new-task]");
-    if (!input || event.key !== "Enter") {
-      return;
-    }
-
-    event.preventDefault();
-    addTask(input.dataset.lifehubNewTask);
-  }
-
-  function handleStorage(event) {
-    if (event.key !== STORAGE_KEY) {
-      return;
-    }
-
-    const visibleModule = getVisibleModuleKey();
-    if (visibleModule) {
-      renderModulePage(visibleModule);
-    }
-    renderHomeEnhancements();
-  }
-
-  function handleSyncStatus(event) {
-    const detail = event.detail || {};
-    syncState.mode = String(detail.mode || "checking");
-    syncState.savedAt = String(detail.savedAt || "");
-    updateSyncBadges();
-    if (isHomeVisible()) {
-      renderHomeEnhancements();
-    }
-  }
-
-  function handleRemoteStateUpdate() {
-    const visibleModule = getVisibleModuleKey();
-    if (visibleModule) {
-      renderModulePage(visibleModule);
-    }
-    renderHomeEnhancements();
-  }
-
   function installNavigation() {
     window.navTo = function (page) {
-      const nextPage = String(page || "home");
-      if (nextPage !== "home") {
-        setLastVisitedPage(nextPage);
-      }
-      setHashForPage(nextPage);
-      showPage(nextPage);
+      showPage(String(page || "home"));
     };
   }
 
@@ -1142,7 +1384,7 @@
       return;
     }
 
-    renderHomeEnhancements();
+    renderHome();
   }
 
   function bootstrap() {
@@ -1154,13 +1396,14 @@
     }
 
     installNavigation();
-    document.addEventListener("input", handleInput);
+    document.addEventListener("input", handleModuleInput);
     document.addEventListener("click", handleClick);
     document.addEventListener("keydown", handleKeydown);
     window.addEventListener("storage", handleStorage);
     window.addEventListener("life-hub-sync-status", handleSyncStatus);
     window.addEventListener("life-hub-state-updated", handleRemoteStateUpdate);
     openInitialPage();
+    renderFitnessIdeaPanel();
   }
 
   bootstrap();
