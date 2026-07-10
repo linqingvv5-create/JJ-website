@@ -223,6 +223,12 @@ a.secondary-button {
   justify-content: flex-end;
 }
 
+.secondary-button.is-active {
+  border-color: #104baf;
+  background: #104baf;
+  color: #ffffff;
+}
+
 .view {
   display: none;
 }
@@ -356,6 +362,117 @@ a.secondary-button {
 
 .holding-table {
   min-width: 1310px;
+}
+
+.mobile-account-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mobile-account-metric {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+}
+
+.mobile-account-metric strong {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.mobile-cash-field {
+  display: grid;
+  gap: 6px;
+}
+
+.mobile-cash-field input,
+.mobile-metric-input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.mobile-holding-list,
+.mobile-plan-list {
+  display: grid;
+  gap: 10px;
+}
+
+.holding-mobile-card,
+.plan-mobile-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.holding-mobile-card:first-child,
+.plan-mobile-card:first-child {
+  border-top: 0;
+}
+
+.holding-mobile-head,
+.plan-mobile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.holding-mobile-main {
+  display: grid;
+  gap: 4px;
+}
+
+.mobile-holding-grid,
+.mobile-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mobile-plan-grid .detail-field,
+.mobile-plan-grid .detail-stat {
+  min-height: auto;
+}
+
+.mobile-metric-block {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+
+.mobile-metric-block strong,
+.mobile-metric-block span:last-child {
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.mobile-metric-block.full-width {
+  grid-column: 1 / -1;
+}
+
+.mobile-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mobile-card-actions .row-button {
+  flex: 1 1 140px;
+}
+
+.mobile-empty-card {
+  padding: 12px;
+  color: var(--muted);
 }
 
 .plan-table {
@@ -684,6 +801,10 @@ button:focus-visible {
   .detail-side-panel {
     width: 100%;
   }
+
+  .mobile-account-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 560px) {
@@ -709,6 +830,18 @@ button:focus-visible {
   }
 
   .risk-inline {
+    width: 100%;
+  }
+
+  .mobile-account-summary,
+  .mobile-holding-grid,
+  .mobile-plan-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-card-actions .row-button,
+  .header-actions button,
+  .header-actions a {
     width: 100%;
   }
 }

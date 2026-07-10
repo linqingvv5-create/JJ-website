@@ -29,6 +29,7 @@
   const FAMILY_BYD_HOLDING_ID = "family-002594";
   const FAMILY_BYD_LEGACY_PLAN_ID = "family-byd-plan-1";
   const syncClientKey = "linqing-minimal-trade-board-client-id";
+  const tradeViewModeKey = "linqing-minimal-trade-board-view-mode";
   const syncApiStateUrl = "/api/state";
   const syncApiActionUrl = "/api/actions";
   const syncPollIntervalMs = 5000;
@@ -41,6 +42,7 @@
   const resetButton = document.getElementById("reset-data-btn");
   const exportButton = document.getElementById("export-data-btn");
   const importButton = document.getElementById("import-data-btn");
+  const viewToggleButton = document.getElementById("view-toggle-btn");
   const importFile = document.getElementById("import-file");
   const homeView = document.getElementById("home-view");
   const detailView = document.getElementById("detail-view");
@@ -54,6 +56,7 @@
   let selectedMode = "detail";
   let detailAutoSaveTimerId = 0;
   let detailSaveStatusText = "";
+  let tradeViewPreference = loadTradeViewPreference();
   let syncQueue = Promise.resolve();
   const syncState = {
     clientId: getOrCreateClientId(),
@@ -70,6 +73,12 @@
   void initializeSync();
 
   function bindEvents() {
+    if (viewToggleButton) {
+      viewToggleButton.addEventListener("click", () => {
+        toggleTradeViewMode();
+      });
+    }
+
     backButton.addEventListener("click", () => {
       clearDetailAutoSaveTimer();
       detailSaveStatusText = "";
@@ -218,6 +227,12 @@
         });
       }
     });
+
+    window.addEventListener("resize", () => {
+      if (tradeViewPreference === "auto") {
+        renderApp();
+      }
+    });
   }
 
   function loadState() {
@@ -252,6 +267,49 @@
     } catch (error) {
       return false;
     }
+  }
+
+  function loadTradeViewPreference() {
+    try {
+      const raw = String(window.localStorage.getItem(tradeViewModeKey) || "auto").trim();
+      return raw === "mobile" || raw === "desktop" ? raw : "auto";
+    } catch (error) {
+      return "auto";
+    }
+  }
+
+  function saveTradeViewPreference() {
+    try {
+      window.localStorage.setItem(tradeViewModeKey, tradeViewPreference);
+    } catch (error) {
+    }
+  }
+
+  function getTradeViewMode() {
+    if (tradeViewPreference === "mobile" || tradeViewPreference === "desktop") {
+      return tradeViewPreference;
+    }
+
+    return window.matchMedia("(max-width: 760px)").matches ? "mobile" : "desktop";
+  }
+
+  function toggleTradeViewMode() {
+    tradeViewPreference = getTradeViewMode() === "mobile" ? "desktop" : "mobile";
+    saveTradeViewPreference();
+    renderApp();
+  }
+
+  function updateViewToggleButton() {
+    if (!viewToggleButton) {
+      return;
+    }
+
+    const mode = getTradeViewMode();
+    viewToggleButton.textContent = mode === "mobile" ? "标准版" : "手机版";
+    viewToggleButton.classList.toggle("is-active", mode === "mobile");
+    viewToggleButton.title = tradeViewPreference === "auto"
+      ? "当前会按屏幕宽度自动切换，你也可以手动锁定成另一种视图。"
+      : "已手动切换视图，再点一次可切换到另一种版面。";
   }
 
   async function initializeSync() {
@@ -484,6 +542,7 @@
     renderHomeView();
     renderDetailView();
     renderSyncStatus();
+    updateViewToggleButton();
   }
 
   function renderHeader() {
@@ -503,105 +562,6 @@
     backButton.classList.remove("hidden");
     homeView.classList.remove("is-active");
     detailView.classList.add("is-active");
-  }
-
-  function renderHomeView() {
-    const homeSummary = computeHomeSummary();
-
-    accountList.innerHTML = `
-      <section class="overview-section">
-        <div class="overview-bar">
-          <span class="section-kicker">首页总览</span>
-
-          <div class="overview-metric">
-            <span class="field-label">总资产</span>
-            <strong>${escapeHtml(homeSummary.totalAssetText)}</strong>
-          </div>
-
-          <div class="overview-metric">
-            <span class="field-label">总市值</span>
-            <strong>${escapeHtml(homeSummary.marketValueText)}</strong>
-          </div>
-
-          <div class="overview-metric">
-            <span class="field-label">总可用资金</span>
-            <strong>${escapeHtml(homeSummary.availableCashText)}</strong>
-          </div>
-
-          <label class="overview-inline-field">
-            <span class="field-label">银行资金</span>
-            <input
-              class="overview-inline-input"
-              type="number"
-              step="0.01"
-              inputmode="decimal"
-              data-home-bank-cash
-              value="${escapeAttribute(formatInputNumber(state.bankCash, 2))}"
-              placeholder="待填"
-            >
-          </label>
-        </div>
-      </section>
-    ${state.accounts
-      .map((account) => {
-        const holdings = getHoldingsByAccount(account.id);
-        const summary = computeAccountSummary(account.id);
-
-        return `
-          <section class="account-section">
-            <div class="account-header">
-              <div class="account-title-row">
-                <span class="account-label">${escapeHtml(account.label)}</span>
-                <h2 class="account-title">${escapeHtml(account.name)}</h2>
-              </div>
-
-              <div class="account-summary-line">
-                <span>总资产 <strong>${escapeHtml(summary.totalAssetText)}</strong></span>
-                <span>总市值 <strong>${escapeHtml(summary.marketValueText)}</strong></span>
-                <label class="summary-inline-field">
-                  <span>可用资金</span>
-                  <input
-                    class="summary-inline-input"
-                    type="number"
-                    step="0.01"
-                    inputmode="decimal"
-                    data-home-cash="${escapeAttribute(account.id)}"
-                    value="${escapeAttribute(formatInputNumber(account.availableCash, 2))}"
-                    placeholder="待填"
-                  >
-                </label>
-                <span>总成本 <strong>${escapeHtml(summary.costText)}</strong></span>
-                <span>浮盈亏 <strong class="${getProfitClass(summary.floatingPnlNumber)}">${escapeHtml(summary.floatingPnlText)}</strong></span>
-                <span>今日操作 <strong>${escapeHtml(summary.todayNeedActionText)}</strong></span>
-              </div>
-            </div>
-
-            <div class="table-scroll">
-              <table class="holding-table">
-                <thead>
-                  <tr>
-                    <th>股票名称 + 代码</th>
-                    <th>当前持仓</th>
-                    <th>成本价</th>
-                    <th>当前价</th>
-                    <th>当前市值</th>
-                    <th>浮盈亏</th>
-                    <th>当前状态</th>
-                    <th>下一触发价</th>
-                    <th>下一步动作</th>
-                    <th>未执行计划数量</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${holdings.length ? holdings.map((holding) => renderHoldingRow(holding)).join("") : renderEmptyHoldingRow()}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        `;
-      })
-      .join("")}`;
   }
 
   function renderHoldingRow(holding) {
@@ -652,130 +612,6 @@
         <td colspan="11">当前账户暂无持仓。</td>
       </tr>
     `;
-  }
-
-  function renderDetailView() {
-    const holding = selectedHoldingId ? getHoldingById(selectedHoldingId) : null;
-    if (!holding) {
-      detailContent.innerHTML = "";
-      return;
-    }
-
-    const metrics = computeHoldingMetrics(holding);
-    const planSummary = computePlanSummary(holding.id);
-    const plans = getPlansForHolding(holding.id);
-
-    detailContent.innerHTML = `
-      <form id="detail-form" data-holding-id="${escapeAttribute(holding.id)}">
-        <section class="detail-panel">
-          <div class="detail-topline">
-            <div class="detail-title-block">
-              <p class="section-kicker">股票详情</p>
-              <h2 class="detail-title">${escapeHtml(holding.name)} ${escapeHtml(holding.code)}</h2>
-            </div>
-            <div class="detail-side-panel">
-              <div class="detail-side-head">
-                <span class="field-label">心得 / 感悟</span>
-                <span
-                  class="status-chip ${getStatusClass(planSummary.nextPlanStatus)}${planSummary.nextPlanStatus ? "" : " hidden"}"
-                  data-live-next-status
-                >${escapeHtml(planSummary.nextPlanStatus || "")}</span>
-              </div>
-
-              <textarea
-                class="detail-reflection-textarea"
-                name="holdingReflection"
-                rows="6"
-                placeholder="写下你的判断、心得、提醒..."
-              >${escapeHtml(holding.reflectionNote || "")}</textarea>
-            </div>
-          </div>
-
-          <div class="detail-summary-grid">
-            <label class="detail-field">
-              <span class="field-label">当前持仓</span>
-              <input type="number" step="100" min="0" name="holdingShares" value="${escapeAttribute(formatInputNumber(holding.shares, 0))}">
-            </label>
-
-            <label class="detail-field">
-              <span class="field-label">成本价</span>
-              <input type="number" step="0.001" min="0" name="holdingCost" value="${escapeAttribute(formatInputNumber(holding.cost, 3))}" placeholder="待填">
-            </label>
-
-            <label class="detail-field">
-              <span class="field-label">当前价</span>
-              <input type="number" step="0.001" min="0" name="holdingCurrentPrice" value="${escapeAttribute(formatInputNumber(holding.currentPrice, 3))}" placeholder="待填">
-            </label>
-
-            <div class="detail-stat">
-              <span class="field-label">当前市值</span>
-              <strong data-live-market-value>${escapeHtml(metrics.marketValueText)}</strong>
-            </div>
-
-            <div class="detail-stat">
-              <span class="field-label">浮盈亏</span>
-              <strong class="${getProfitClass(metrics.floatingPnl)}" data-live-floating-pnl>${escapeHtml(metrics.floatingPnlText)}</strong>
-            </div>
-
-            <div class="detail-stat">
-              <span class="field-label">下一步动作</span>
-              <span
-                class="${planSummary.hasNextPlan ? "action-tag" : "action-tag action-tag-muted"}"
-                data-live-next-action
-              >${escapeHtml(planSummary.nextActionText)}</span>
-            </div>
-          </div>
-
-          ${
-            holding.extraNote
-              ? `<p class="detail-note">备注：${escapeHtml(holding.extraNote)}</p>`
-              : ""
-          }
-
-          <div class="detail-actions">
-            <button class="primary-button" type="submit">保存修改</button>
-            <span class="save-status${detailSaveStatusText ? " is-visible" : ""}" data-save-status>${escapeHtml(detailSaveStatusText)}</span>
-          </div>
-        </section>
-
-        <section class="plan-section">
-          <div class="section-head">
-            <h3 class="section-title">买卖计划表</h3>
-            <p class="section-note">所有输入框和状态下拉框都会自动保存到浏览器本地存储。</p>
-            <button class="secondary-button" type="button" data-add-plan="${escapeAttribute(holding.id)}">新增一行计划</button>
-          </div>
-
-          <div class="table-scroll">
-            <table class="plan-table">
-              <thead>
-                <tr>
-                  <th>计划ID</th>
-                  <th>类型</th>
-                  <th>触发价</th>
-                  <th>股数</th>
-                  <th>金额</th>
-                  <th>状态</th>
-                  <th>备注</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${plans.length ? plans.map((plan) => renderPlanRow(plan)).join("") : renderNoPlans()}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </form>
-    `;
-
-    if (selectedMode === "edit") {
-      const input = detailContent.querySelector('input[name="holdingCurrentPrice"]') || detailContent.querySelector('input[name="holdingShares"]');
-      if (input) {
-        window.requestAnimationFrame(() => {
-          input.focus();
-          input.select();
-        });
-      }
-    }
   }
 
   function renderPlanRow(plan) {
@@ -1759,6 +1595,419 @@
     const hour = String(date.getHours()).padStart(2, "0");
     const minute = String(date.getMinutes()).padStart(2, "0");
     return `${year}${month}${day}-${hour}${minute}`;
+  }
+
+  function renderHomeView() {
+    const homeSummary = computeHomeSummary();
+    const isMobileView = getTradeViewMode() === "mobile";
+
+    accountList.innerHTML = `
+      <section class="overview-section">
+        <div class="overview-bar">
+          <span class="section-kicker">首页总览</span>
+
+          <div class="overview-metric">
+            <span class="field-label">总资产</span>
+            <strong>${escapeHtml(homeSummary.totalAssetText)}</strong>
+          </div>
+
+          <div class="overview-metric">
+            <span class="field-label">总市值</span>
+            <strong>${escapeHtml(homeSummary.marketValueText)}</strong>
+          </div>
+
+          <div class="overview-metric">
+            <span class="field-label">总可用资金</span>
+            <strong>${escapeHtml(homeSummary.availableCashText)}</strong>
+          </div>
+
+          <label class="overview-inline-field">
+            <span class="field-label">银行资金</span>
+            <input
+              class="overview-inline-input"
+              type="number"
+              step="0.01"
+              inputmode="decimal"
+              data-home-bank-cash
+              value="${escapeAttribute(formatInputNumber(state.bankCash, 2))}"
+              placeholder="待填"
+            >
+          </label>
+        </div>
+      </section>
+      ${state.accounts.map((account) => {
+        const holdings = getHoldingsByAccount(account.id);
+        const summary = computeAccountSummary(account.id);
+        return isMobileView
+          ? renderMobileAccountSection(account, holdings, summary)
+          : renderDesktopAccountSection(account, holdings, summary);
+      }).join("")}
+    `;
+  }
+
+  function renderDesktopAccountSection(account, holdings, summary) {
+    return `
+      <section class="account-section">
+        <div class="account-header">
+          <div class="account-title-row">
+            <span class="account-label">${escapeHtml(account.label)}</span>
+            <h2 class="account-title">${escapeHtml(account.name)}</h2>
+          </div>
+
+          <div class="account-summary-line">
+            <span>总资产<strong>${escapeHtml(summary.totalAssetText)}</strong></span>
+            <span>总市值<strong>${escapeHtml(summary.marketValueText)}</strong></span>
+            <label class="summary-inline-field">
+              <span>可用资金</span>
+              <input
+                class="summary-inline-input"
+                type="number"
+                step="0.01"
+                inputmode="decimal"
+                data-home-cash="${escapeAttribute(account.id)}"
+                value="${escapeAttribute(formatInputNumber(account.availableCash, 2))}"
+                placeholder="待填"
+              >
+            </label>
+            <span>总成本<strong>${escapeHtml(summary.costText)}</strong></span>
+            <span>浮盈亏<strong class="${getProfitClass(summary.floatingPnlNumber)}">${escapeHtml(summary.floatingPnlText)}</strong></span>
+            <span>今日操作 <strong>${escapeHtml(summary.todayNeedActionText)}</strong></span>
+          </div>
+        </div>
+
+        <div class="table-scroll">
+          <table class="holding-table">
+            <thead>
+              <tr>
+                <th>股票名称 + 代码</th>
+                <th>当前持仓</th>
+                <th>成本价</th>
+                <th>当前价</th>
+                <th>当前市值</th>
+                <th>浮盈亏</th>
+                <th>当前状态</th>
+                <th>下一触发价</th>
+                <th>下一步动作</th>
+                <th>未执行计划数量</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${holdings.length ? holdings.map((holding) => renderHoldingRow(holding)).join("") : renderEmptyHoldingRow()}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderMobileAccountSection(account, holdings, summary) {
+    return `
+      <section class="account-section">
+        <div class="account-header">
+          <div class="account-title-row">
+            <span class="account-label">${escapeHtml(account.label)}</span>
+            <h2 class="account-title">${escapeHtml(account.name)}</h2>
+          </div>
+
+          <div class="mobile-account-summary">
+            <div class="mobile-account-metric">
+              <span class="field-label">总资产</span>
+              <strong>${escapeHtml(summary.totalAssetText)}</strong>
+            </div>
+            <div class="mobile-account-metric">
+              <span class="field-label">总市值</span>
+              <strong>${escapeHtml(summary.marketValueText)}</strong>
+            </div>
+            <label class="mobile-account-metric mobile-cash-field">
+              <span class="field-label">可用资金</span>
+              <input
+                class="mobile-metric-input"
+                type="number"
+                step="0.01"
+                inputmode="decimal"
+                data-home-cash="${escapeAttribute(account.id)}"
+                value="${escapeAttribute(formatInputNumber(account.availableCash, 2))}"
+                placeholder="待填"
+              >
+            </label>
+          </div>
+        </div>
+
+        <div class="mobile-holding-list">
+          ${holdings.length ? holdings.map((holding) => renderHoldingMobileCard(holding)).join("") : `<div class="mobile-empty-card">当前账户暂无持仓。</div>`}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderHoldingMobileCard(holding) {
+    const metrics = computeHoldingMetrics(holding);
+    const planSummary = computePlanSummary(holding.id);
+    const actionClass = planSummary.hasNextPlan ? "action-tag" : "action-tag action-tag-muted";
+
+    return `
+      <article class="holding-mobile-card">
+        <div class="holding-mobile-head">
+          <div class="holding-mobile-main">
+            <strong>${escapeHtml(holding.name)}</strong>
+            <span class="stock-code">${escapeHtml(holding.code)}</span>
+          </div>
+          <span class="status-chip ${getStatusClass(planSummary.nextPlanStatus)}${planSummary.nextPlanStatus ? "" : " hidden"}">${escapeHtml(planSummary.nextPlanStatus || "")}</span>
+        </div>
+
+        <div class="mobile-holding-grid">
+          <div class="mobile-metric-block">
+            <span class="field-label">持仓</span>
+            <strong>${escapeHtml(formatShares(holding.shares))}</strong>
+          </div>
+          <div class="mobile-metric-block">
+            <span class="field-label">成本价</span>
+            <strong>${escapeHtml(displayPriceOrPending(holding.cost, "待填", 3))}</strong>
+          </div>
+          <label class="mobile-metric-block">
+            <span class="field-label">当前价</span>
+            <input
+              class="mobile-metric-input"
+              type="number"
+              step="0.001"
+              inputmode="decimal"
+              data-home-price="${escapeAttribute(holding.id)}"
+              value="${escapeAttribute(formatInputNumber(holding.currentPrice, 3))}"
+              placeholder="待填"
+            >
+          </label>
+          <div class="mobile-metric-block">
+            <span class="field-label">当前市值</span>
+            <strong>${escapeHtml(metrics.marketValueText)}</strong>
+          </div>
+          <div class="mobile-metric-block">
+            <span class="field-label">浮盈亏</span>
+            <strong class="${getProfitClass(metrics.floatingPnl)}">${escapeHtml(metrics.floatingPnlText)}</strong>
+          </div>
+          <div class="mobile-metric-block">
+            <span class="field-label">当前状态</span>
+            <span>${escapeHtml(holding.status || "待补充")}</span>
+          </div>
+          <div class="mobile-metric-block full-width">
+            <span class="field-label">下一步动作</span>
+            <span class="${actionClass}">${escapeHtml(planSummary.nextActionText)}</span>
+          </div>
+        </div>
+
+        <div class="mobile-card-actions">
+          <button class="row-button" type="button" data-open-holding="${escapeAttribute(holding.id)}" data-open-mode="detail">详情</button>
+          <button class="row-button row-button-accent" type="button" data-open-holding="${escapeAttribute(holding.id)}" data-open-mode="edit">编辑</button>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderPlanEditorSection(holding, plans, isMobileView) {
+    return `
+      <section class="plan-section">
+        <div class="section-head">
+          <h3 class="section-title">买卖计划</h3>
+          <p class="section-note">所有输入都会自动保存。手机版会改成上下排布，不需要左右滑。</p>
+          <button class="secondary-button" type="button" data-add-plan="${escapeAttribute(holding.id)}">新增一行计划</button>
+        </div>
+
+        ${isMobileView ? `
+          <div class="mobile-plan-list">
+            ${plans.length ? plans.map((plan) => renderPlanMobileCard(plan)).join("") : renderNoPlansMobile()}
+          </div>
+        ` : `
+          <div class="table-scroll">
+            <table class="plan-table">
+              <thead>
+                <tr>
+                  <th>计划ID</th>
+                  <th>类型</th>
+                  <th>触发价</th>
+                  <th>股数</th>
+                  <th>金额</th>
+                  <th>状态</th>
+                  <th>备注</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${plans.length ? plans.map((plan) => renderPlanRow(plan)).join("") : renderNoPlans()}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </section>
+    `;
+  }
+
+  function renderPlanMobileCard(plan) {
+    return `
+      <div
+        class="plan-mobile-card plan-row"
+        data-plan-id="${escapeAttribute(plan.id)}"
+        data-plan-label="${escapeAttribute(plan.label || plan.id)}"
+      >
+        <div class="plan-mobile-head">
+          <strong>${escapeHtml(plan.label || plan.id)}</strong>
+          <span class="status-chip ${getStatusClass(plan.status)}">${escapeHtml(plan.status)}</span>
+        </div>
+
+        <div class="mobile-plan-grid">
+          <label class="detail-field">
+            <span class="field-label">类型</span>
+            <select class="cell-select" data-field="type">
+              ${renderPlanTypeOptions(plan.type)}
+            </select>
+          </label>
+
+          <label class="detail-field">
+            <span class="field-label">触发价</span>
+            <input
+              class="cell-input cell-input-short"
+              type="number"
+              step="0.001"
+              min="0"
+              data-field="triggerPrice"
+              value="${escapeAttribute(formatInputNumber(plan.triggerPrice, 3))}"
+              placeholder="待填"
+            >
+          </label>
+
+          <label class="detail-field">
+            <span class="field-label">股数</span>
+            <input
+              class="cell-input cell-input-short"
+              type="number"
+              step="100"
+              min="0"
+              data-field="shares"
+              value="${escapeAttribute(formatInputNumber(plan.shares, 0))}"
+              placeholder="待填"
+            >
+          </label>
+
+          <div class="detail-stat">
+            <span class="field-label">金额</span>
+            <strong data-plan-amount>${escapeHtml(getPlanAmountText(plan))}</strong>
+          </div>
+
+          <label class="detail-field">
+            <span class="field-label">状态</span>
+            <select class="cell-select" data-field="status">
+              ${renderStatusOptions(plan.status)}
+            </select>
+          </label>
+
+          <label class="detail-field">
+            <span class="field-label">备注</span>
+            <input
+              class="cell-input cell-input-note"
+              type="text"
+              data-field="note"
+              value="${escapeAttribute(plan.note || "")}"
+              placeholder="备注"
+            >
+          </label>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderNoPlansMobile() {
+    return `<div class="mobile-empty-card">当前没有买卖计划，点上方按钮就能新增。</div>`;
+  }
+
+  function renderDetailView() {
+    const holding = selectedHoldingId ? getHoldingById(selectedHoldingId) : null;
+    if (!holding) {
+      detailContent.innerHTML = "";
+      return;
+    }
+
+    const isMobileView = getTradeViewMode() === "mobile";
+    const metrics = computeHoldingMetrics(holding);
+    const planSummary = computePlanSummary(holding.id);
+    const plans = getPlansForHolding(holding.id);
+
+    detailContent.innerHTML = `
+      <form id="detail-form" data-holding-id="${escapeAttribute(holding.id)}">
+        <section class="detail-panel">
+          <div class="detail-topline">
+            <div class="detail-title-block">
+              <p class="section-kicker">股票详情</p>
+              <h2 class="detail-title">${escapeHtml(holding.name)} ${escapeHtml(holding.code)}</h2>
+            </div>
+            <div class="detail-side-panel">
+              <div class="detail-side-head">
+                <span class="field-label">心得 / 感悟</span>
+                <span
+                  class="status-chip ${getStatusClass(planSummary.nextPlanStatus)}${planSummary.nextPlanStatus ? "" : " hidden"}"
+                  data-live-next-status
+                >${escapeHtml(planSummary.nextPlanStatus || "")}</span>
+              </div>
+
+              <textarea
+                class="detail-reflection-textarea"
+                name="holdingReflection"
+                rows="6"
+                placeholder="写下你的判断、原因、提醒点。"
+              >${escapeHtml(holding.reflectionNote || "")}</textarea>
+            </div>
+          </div>
+
+          <div class="detail-summary-grid">
+            <label class="detail-field">
+              <span class="field-label">当前持仓</span>
+              <input type="number" step="100" min="0" name="holdingShares" value="${escapeAttribute(formatInputNumber(holding.shares, 0))}">
+            </label>
+
+            <label class="detail-field">
+              <span class="field-label">成本价</span>
+              <input type="number" step="0.001" min="0" name="holdingCost" value="${escapeAttribute(formatInputNumber(holding.cost, 3))}" placeholder="待填">
+            </label>
+
+            <label class="detail-field">
+              <span class="field-label">当前价</span>
+              <input type="number" step="0.001" min="0" name="holdingCurrentPrice" value="${escapeAttribute(formatInputNumber(holding.currentPrice, 3))}" placeholder="待填">
+            </label>
+
+            <div class="detail-stat">
+              <span class="field-label">当前市值</span>
+              <strong data-live-market-value>${escapeHtml(metrics.marketValueText)}</strong>
+            </div>
+
+            <div class="detail-stat">
+              <span class="field-label">浮盈亏</span>
+              <strong class="${getProfitClass(metrics.floatingPnl)}" data-live-floating-pnl>${escapeHtml(metrics.floatingPnlText)}</strong>
+            </div>
+
+            <div class="detail-stat">
+              <span class="field-label">下一步动作</span>
+              <span class="${planSummary.hasNextPlan ? "action-tag" : "action-tag action-tag-muted"}" data-live-next-action>${escapeHtml(planSummary.nextActionText)}</span>
+            </div>
+          </div>
+
+          ${holding.extraNote ? `<p class="detail-note">备注：${escapeHtml(holding.extraNote)}</p>` : ""}
+
+          <div class="detail-actions">
+            <button class="primary-button" type="submit">保存修改</button>
+            <span class="save-status${detailSaveStatusText ? " is-visible" : ""}" data-save-status>${escapeHtml(detailSaveStatusText)}</span>
+          </div>
+        </section>
+
+        ${renderPlanEditorSection(holding, plans, isMobileView)}
+      </form>
+    `;
+
+    if (selectedMode === "edit") {
+      const input = detailContent.querySelector('input[name="holdingCurrentPrice"]') || detailContent.querySelector('input[name="holdingShares"]');
+      if (input) {
+        window.requestAnimationFrame(() => {
+          input.focus();
+          input.select();
+        });
+      }
+    }
   }
 
   function renderHeader() {

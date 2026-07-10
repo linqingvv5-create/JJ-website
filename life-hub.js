@@ -80,6 +80,10 @@
     ideaText: "",
     ideaNote: "",
   };
+  const ideaLibraryState = {
+    sort: "pending",
+    tag: "all",
+  };
   const syncState = {
     mode: "checking",
     savedAt: "",
@@ -401,6 +405,31 @@
         font-weight: 700;
       }
 
+      .idea-archive-toolbar {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .idea-archive-toolbar-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .idea-toolbar-label {
+        min-width: 64px;
+        font-size: 12px;
+        color: var(--mt);
+        font-weight: 700;
+      }
+
+      .idea-filter-summary {
+        font-size: 12px;
+        color: var(--mt);
+      }
+
       .life-module-shell {
         padding-bottom: 10px;
       }
@@ -460,6 +489,15 @@
       @media (max-width: 760px) {
         .life-module-two-col {
           grid-template-columns: 1fr;
+        }
+
+        .idea-archive-toolbar-row {
+          align-items: flex-start;
+        }
+
+        .idea-toolbar-label {
+          width: 100%;
+          min-width: 0;
         }
 
         .today-plan-creator,
@@ -664,6 +702,41 @@
     return loadHubState().ideas.filter((idea) => idea.tags.includes(tagKey));
   }
 
+  function getIdeaTimestamp(idea) {
+    const time = new Date(idea && idea.createdAt ? idea.createdAt : "").getTime();
+    return Number.isFinite(time) ? time : 0;
+  }
+
+  function getIdeaFilterLabel(tag) {
+    if (tag === "all") {
+      return "全部";
+    }
+    return MODULE_CONFIG[tag] ? MODULE_CONFIG[tag].shortTitle : tag;
+  }
+
+  function getIdeasForLibrary(ideas) {
+    const source = Array.isArray(ideas) ? ideas : [];
+    const filtered = ideaLibraryState.tag === "all"
+      ? [...source]
+      : source.filter((idea) => idea.tags.includes(ideaLibraryState.tag));
+
+    if (ideaLibraryState.sort === "latest") {
+      return filtered.sort((left, right) => getIdeaTimestamp(right) - getIdeaTimestamp(left));
+    }
+
+    if (ideaLibraryState.sort === "oldest") {
+      return filtered.sort((left, right) => getIdeaTimestamp(left) - getIdeaTimestamp(right));
+    }
+
+    return filtered.sort((left, right) => {
+      const doneDiff = Number(left.done) - Number(right.done);
+      if (doneDiff !== 0) {
+        return doneDiff;
+      }
+      return getIdeaTimestamp(right) - getIdeaTimestamp(left);
+    });
+  }
+
   function getVisibleModuleKey() {
     return MODULE_KEYS.find((moduleKey) => {
       const node = document.getElementById(MODULE_PAGE_IDS[moduleKey]);
@@ -746,7 +819,7 @@
                   <span class="idea-tag">${tag.icon} ${tag.shortTitle}</span>
                 `).join("")}
               </div>
-              <div class="idea-time">${contextTag ? `归档到 ${MODULE_CONFIG[contextTag].title}` : formatTimeLabel(idea.createdAt)}</div>
+              <div class="idea-time">${contextTag ? `归到 ${MODULE_CONFIG[contextTag].title}` : formatTimeLabel(idea.createdAt)}</div>
             </div>
           </div>
         </div>
@@ -755,7 +828,7 @@
     `;
   }
 
-  function renderIdeaSection(ideas) {
+  function renderIdeaComposerSection(ideas) {
     const pendingCount = countPending(ideas);
     const selectedTags = IDEA_TAGS.filter((tag) => selectedIdeaTags.has(tag));
 
@@ -764,13 +837,13 @@
         <div class="home-board-head">
           <div>
             <h2>灵感随记</h2>
-            <div class="home-board-meta">${pendingCount ? `${pendingCount} 条还在推进` : "想到就记，后面再慢慢整理"}</div>
+            <div class="home-board-meta">${pendingCount ? `${pendingCount} 条还在推进` : "想到就记，保存后会进入下面的灵感库"}</div>
           </div>
         </div>
 
         <div class="idea-composer">
           <input class="idea-input" type="text" id="ideaTextInput" placeholder="一句话先记下来" value="${escapeHtml(homeDraft.ideaText)}">
-          <textarea class="idea-notes-input" id="ideaNoteInput" placeholder="补充一点背景、步骤、细节也行（可空）">${escapeHtml(homeDraft.ideaNote)}</textarea>
+          <textarea class="idea-notes-input" id="ideaNoteInput" placeholder="补充背景、步骤、细节都可以（可空）">${escapeHtml(homeDraft.ideaNote)}</textarea>
           <div class="tag-picker">
             ${IDEA_TAGS.map((tag) => `
               <button
@@ -781,20 +854,66 @@
               >${MODULE_CONFIG[tag].icon} ${MODULE_CONFIG[tag].shortTitle}</button>
             `).join("")}
           </div>
-          <div class="home-helper">可以多选标签。比如同一条灵感，同时归到健身和博主。</div>
+          <div class="home-helper">可以多选标签，比如同一条灵感同时归到健身和博主。</div>
           <div class="idea-creator">
             <div class="home-helper">${selectedTags.length ? `当前标签：${selectedTags.map((tag) => MODULE_CONFIG[tag].shortTitle).join("、")}` : "至少选一个标签再保存"}</div>
             <button class="idea-add" type="button" data-home-action="add-idea">保存灵感</button>
           </div>
+          <div class="home-helper">保存后会进入下面的“灵感库”，你可以按标签、时间和完成状态慢慢整理。</div>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderIdeaArchiveSection(ideas) {
+    const filteredIdeas = getIdeasForLibrary(ideas);
+    const pendingCount = countPending(filteredIdeas);
+    const currentTagLabel = getIdeaFilterLabel(ideaLibraryState.tag);
+    const sortLabel = ideaLibraryState.sort === "pending"
+      ? "未完成优先"
+      : ideaLibraryState.sort === "latest"
+        ? "最新优先"
+        : "最早优先";
+
+    return `
+      <section class="home-board-card">
+        <div class="home-board-head">
+          <div>
+            <h2>灵感库</h2>
+            <div class="home-board-meta">${filteredIdeas.length ? `${filteredIdeas.length} 条，${pendingCount} 条未完成` : "这里会完整保存你写过的灵感"}</div>
+          </div>
+        </div>
+
+        <div class="idea-archive-toolbar">
+          <div class="idea-archive-toolbar-row">
+            <span class="idea-toolbar-label">排序</span>
+            <button class="tag-chip${ideaLibraryState.sort === "pending" ? " is-selected" : ""}" type="button" data-home-action="set-idea-sort" data-sort="pending">未完成优先</button>
+            <button class="tag-chip${ideaLibraryState.sort === "latest" ? " is-selected" : ""}" type="button" data-home-action="set-idea-sort" data-sort="latest">最新优先</button>
+            <button class="tag-chip${ideaLibraryState.sort === "oldest" ? " is-selected" : ""}" type="button" data-home-action="set-idea-sort" data-sort="oldest">最早优先</button>
+          </div>
+          <div class="idea-archive-toolbar-row">
+            <span class="idea-toolbar-label">标签</span>
+            <button class="tag-chip${ideaLibraryState.tag === "all" ? " is-selected" : ""}" type="button" data-home-action="set-idea-filter" data-tag="all">全部</button>
+            ${IDEA_TAGS.map((tag) => `
+              <button class="tag-chip${ideaLibraryState.tag === tag ? " is-selected" : ""}" type="button" data-home-action="set-idea-filter" data-tag="${tag}">
+                ${MODULE_CONFIG[tag].icon} ${MODULE_CONFIG[tag].shortTitle}
+              </button>
+            `).join("")}
+          </div>
+          <div class="idea-filter-summary">当前查看：${currentTagLabel} · ${sortLabel}</div>
         </div>
 
         <div class="home-list">
-          ${ideas.length ? ideas.map((idea) => renderIdeaItem(idea, "")).join("") : `
-            <div class="idea-empty">这里就是你的收纳盒。先把念头放进来，后面再决定放到哪个模块慢慢做。</div>
+          ${filteredIdeas.length ? filteredIdeas.map((idea) => renderIdeaItem(idea, "")).join("") : `
+            <div class="idea-empty">这个筛选条件下还没有内容，换个标签看看，或者先保存一条新的灵感。</div>
           `}
         </div>
       </section>
     `;
+  }
+
+  function renderIdeaSection(ideas) {
+    return `${renderIdeaComposerSection(ideas)}${renderIdeaArchiveSection(ideas)}`;
   }
 
   function renderHomeEnhancements() {
@@ -804,11 +923,9 @@
     }
 
     const state = loadHubState();
-    const sortedIdeas = [...state.ideas].sort((left, right) => Number(left.done) - Number(right.done));
-
     dashboard.innerHTML = `
       ${renderTodayPlanSection(state.todayPlan)}
-      ${renderIdeaSection(sortedIdeas)}
+      ${renderIdeaSection(state.ideas)}
     `;
   }
 
@@ -1036,6 +1153,7 @@
       return;
     }
 
+    homeDraft.todayPlan = "";
     updateHubState((state) => {
       state.todayPlan.unshift({
         id: `today-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
@@ -1047,7 +1165,9 @@
     }, {
       refreshFitnessPanel: true,
     });
-    homeDraft.todayPlan = "";
+    window.requestAnimationFrame(() => {
+      document.getElementById("todayPlanInput")?.focus();
+    });
   }
 
   function addIdea() {
@@ -1069,6 +1189,9 @@
       return;
     }
 
+    homeDraft.ideaText = "";
+    homeDraft.ideaNote = "";
+    selectedIdeaTags.clear();
     updateHubState((state) => {
       state.ideas.unshift({
         id: `idea-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
@@ -1082,8 +1205,9 @@
     }, {
       refreshFitnessPanel: tags.includes("fitness"),
     });
-    homeDraft.ideaText = "";
-    homeDraft.ideaNote = "";
+    window.requestAnimationFrame(() => {
+      document.getElementById("ideaTextInput")?.focus();
+    });
   }
 
   function addModuleTask(moduleKey) {
@@ -1163,6 +1287,22 @@
       return;
     }
 
+    if (action === "set-idea-sort") {
+      ideaLibraryState.sort = tag || itemId || "pending";
+      if (isHomeVisible()) {
+        renderHomeEnhancements();
+      }
+      return;
+    }
+
+    if (action === "set-idea-filter") {
+      ideaLibraryState.tag = tag || "all";
+      if (isHomeVisible()) {
+        renderHomeEnhancements();
+      }
+      return;
+    }
+
     if (action === "toggle-today-plan" && itemId) {
       updateHubState((state) => {
         state.todayPlan = state.todayPlan.map((task) => task.id === itemId ? { ...task, done: !task.done } : task);
@@ -1233,7 +1373,7 @@
       handleHomeAction(
         actionNode.dataset.homeAction,
         actionNode.dataset.itemId,
-        actionNode.dataset.tag
+        actionNode.dataset.tag || actionNode.dataset.sort
       );
       return;
     }
