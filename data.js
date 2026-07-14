@@ -1,17 +1,18 @@
 window.APP_DATA = {
-  bankCash: null,
+  dataRevision: "2026-07-14-actual-3",
+  bankCash: 245500,
   accounts: [
     {
       id: "self",
       label: "华福证券 **1348",
       name: "本人账户",
-      availableCash: null
+      availableCash: 152549.76
     },
     {
       id: "family",
       label: "兴业证券 **7977",
       name: "家庭私募账号",
-      availableCash: null
+      availableCash: 440384.19
     }
   ],
   holdings: [
@@ -22,9 +23,10 @@ window.APP_DATA = {
       code: "002242",
       shares: 20000,
       cost: 11.174,
-      currentPrice: 8.33,
-      marketValueOverride: 166600,
-      floatingPnlOverride: -56986.64,
+      currentPrice: 8.07,
+      marketValueOverride: 161400,
+      floatingPnlOverride: -62183.33,
+      floatingPnlAdjustment: -103.33,
       status: "7.5短打观察",
       risk: "只做7.5附近短线反弹仓，不变成长线加仓；跌破7.30不继续补；跌破7.00重新看主营和财报。",
       extraNote: "九阳7.5短打规则更新版：只做短线反弹仓；触发价7.50附近；首笔上限3000股、总量最多5000股；第一目标8.00；第二目标8.30-8.50；买入后60天没回到8.00则暂停，后续若财报确认主营利润修复，再重新评估是否提高策略等级。"
@@ -36,9 +38,10 @@ window.APP_DATA = {
       code: "002594",
       shares: 600,
       cost: 90.413,
-      currentPrice: 86.87,
-      marketValueOverride: 52122,
-      floatingPnlOverride: -2159.67,
+      currentPrice: 89.35,
+      marketValueOverride: 53610,
+      floatingPnlOverride: -672.62,
+      floatingPnlAdjustment: -34.82,
       status: "观察仓",
       risk: "等待利润质量和 ROIC 拐点，不机械补仓",
       extraNote: "华福证券本人账户当前持有 600 股。"
@@ -50,9 +53,10 @@ window.APP_DATA = {
       code: "002594",
       shares: 1400,
       cost: 83.951,
-      currentPrice: 86.88,
-      marketValueOverride: 121632,
-      floatingPnlOverride: 4022.34,
+      currentPrice: 89.29,
+      marketValueOverride: 125006,
+      floatingPnlOverride: 7394.23,
+      floatingPnlAdjustment: -80.37,
       status: "波段持仓",
       risk: "家庭私募仓位以节奏控制为主，不追高加仓",
       extraNote: "兴业证券家庭私募账户当前持有 1400 股。"
@@ -64,9 +68,10 @@ window.APP_DATA = {
       code: "600900",
       shares: 600,
       cost: 26.74,
-      currentPrice: 26.95,
-      marketValueOverride: 16170,
-      floatingPnlOverride: 111.6,
+      currentPrice: 28.5,
+      marketValueOverride: 17100,
+      floatingPnlOverride: 1041.12,
+      floatingPnlAdjustment: -14.88,
       status: "防守底仓",
       risk: "长江不是高频T标的，不做密集网格",
       extraNote: ""
@@ -77,10 +82,11 @@ window.APP_DATA = {
       name: "招商银行",
       code: "600036",
       shares: 200,
-      cost: 38.025,
-      currentPrice: 36.59,
-      marketValueOverride: 7318,
-      floatingPnlOverride: -296.81,
+      cost: 37.022,
+      currentPrice: 37.08,
+      marketValueOverride: 7416,
+      floatingPnlOverride: 1.74,
+      floatingPnlAdjustment: -9.86,
       status: "核心池观察",
       risk: "银行估值便宜不等于没有风险",
       extraNote: ""
@@ -91,10 +97,11 @@ window.APP_DATA = {
       name: "张江高科",
       code: "600895",
       shares: 600,
-      cost: 37.641,
-      currentPrice: 35.1,
-      marketValueOverride: 21060,
-      floatingPnlOverride: -1541.08,
+      cost: 36.017,
+      currentPrice: 35.27,
+      marketValueOverride: 21162,
+      floatingPnlOverride: -464.86,
+      floatingPnlAdjustment: -16.66,
       status: "遗留退出仓",
       risk: "不新增、不补仓、不做T；反弹分批卖出",
       extraNote: ""

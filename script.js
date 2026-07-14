@@ -1,5 +1,6 @@
 (function () {
-  const storageKey = "linqing-minimal-trade-board-state-v3";
+  const storageKey = "linqing-minimal-trade-board-state-v4";
+  const currentDataRevision = "2026-07-14-actual-3";
   const exportedAppName = "linqing-minimal-trade-board";
   const syncClientKey = "linqing-minimal-trade-board-client-id";
   const viewModeKey = "linqing-minimal-trade-board-view-mode";
@@ -136,6 +137,10 @@
       importFile.value = "";
     });
 
+    document.querySelectorAll("[data-quick-target]").forEach((button) => {
+      button.addEventListener("click", () => handleQuickTarget(button.dataset.quickTarget));
+    });
+
     accountList.addEventListener("click", (event) => {
       const button = event.target.closest("[data-open-holding]");
       if (!button) {
@@ -182,11 +187,13 @@
     if (bankCashInput) {
       state.bankCash = parseNullableNumber(bankCashInput.value);
       saveState();
-      renderHomeView();
-      void syncFullState({
-        successMessage: "已同步首页总览",
-        skipRender: true
-      });
+      if (event.type === "change") {
+        renderHomeView();
+        void syncFullState({
+          successMessage: "已同步首页总览",
+          skipRender: true
+        });
+      }
       return;
     }
 
@@ -199,11 +206,13 @@
 
       account.availableCash = parseNullableNumber(cashInput.value);
       saveState();
-      renderHomeView();
-      void syncFullState({
-        successMessage: "已同步账户概况",
-        skipRender: true
-      });
+      if (event.type === "change") {
+        renderHomeView();
+        void syncFullState({
+          successMessage: "已同步账户概况",
+          skipRender: true
+        });
+      }
       return;
     }
 
@@ -216,15 +225,52 @@
 
       holding.currentPrice = parseNullableNumber(priceInput.value);
       saveState();
-      renderHomeView();
-      if (selectedHoldingId === holding.id) {
-        updateDetailStaticSummary();
+      if (event.type === "change") {
+        renderHomeView();
+        if (selectedHoldingId === holding.id) {
+          updateDetailStaticSummary();
+        }
+        void syncFullState({
+          successMessage: "已同步最新价格",
+          skipRender: true
+        });
       }
+      return;
+    }
+
+    const sharesInput = target.closest("[data-home-shares]");
+    if (sharesInput && event.type === "change") {
+      const holding = getHoldingById(sharesInput.dataset.homeShares);
+      if (!holding) {
+        return;
+      }
+      updateHoldingSharesFromHome(holding, clampShares(sharesInput.value));
+      saveState();
+      renderHomeView();
       void syncFullState({
-        successMessage: "已同步最新价格",
+        successMessage: "已同步持仓股数",
         skipRender: true
       });
     }
+  }
+
+  function handleQuickTarget(target) {
+    if (selectedHoldingId && target === "plans") {
+      selectedDetailTab = DETAIL_TAB.PLANS;
+      renderDetailView();
+      document.querySelector(".detail-tab-bar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    if (selectedHoldingId) {
+      clearDetailAutoSaveTimer();
+      selectedHoldingId = null;
+      selectedDetailTab = DETAIL_TAB.POSITION;
+      renderApp();
+    }
+
+    const selector = target === "funds" ? ".dashboard-summary" : ".holdings-board";
+    requestAnimationFrame(() => document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
   function handleDetailClick(event) {
@@ -553,6 +599,14 @@
       return;
     }
 
+    if (payload.state.dataRevision !== currentDataRevision) {
+      void syncFullState({
+        successMessage: "已同步最新实际账户数据",
+        skipRender: true
+      });
+      return;
+    }
+
     const nextOptions = options || {};
     const remoteState = normalizeState(payload.state);
     state = finalizeState(mergeState(defaultState, remoteState));
@@ -629,7 +683,7 @@
 
   function renderHeader() {
     const holding = selectedHoldingId ? getHoldingById(selectedHoldingId) : null;
-    pageTitle.textContent = "林青交易驾驶舱";
+    pageTitle.textContent = "林青投资系统";
 
     if (!holding) {
       pageSubtitle.textContent = "一屏看清账户、持仓和下一步计划。";
@@ -649,26 +703,23 @@
     const homeSummary = computeHomeSummary();
     accountList.innerHTML = `
       <section class="dashboard-summary">
+        <div class="summary-title-row">
+          <div><strong>人民币账户 · A股</strong><span>资产总览</span></div>
+          <span class="position-badge">仓位 ${escapeHtml(homeSummary.positionText)}</span>
+        </div>
         <div class="summary-grid">
           ${renderSummaryCell("总资产", homeSummary.totalAssetText, "")}
-          ${renderSummaryCell("股票市值", homeSummary.marketValueText, "")}
-          ${renderSummaryCell("可用现金", homeSummary.availableCashText, "")}
-          ${renderSummaryCell("其他资金", homeSummary.otherFundsText, "")}
           ${renderSummaryCell("总浮盈亏", homeSummary.floatingPnlText, getProfitClass(homeSummary.floatingPnlNumber))}
+          ${renderSummaryCell("总市值", homeSummary.marketValueText, "")}
+          ${renderSummaryCell("可用资金", homeSummary.availableCashText, "")}
+          <label class="summary-cell summary-edit-cell">
+            <span class="summary-label">银行资金（含息）</span>
+            <input type="number" step="0.01" inputmode="decimal" data-home-bank-cash value="${escapeAttribute(formatInputNumber(state.bankCash, 2))}" placeholder="待填" title="大额存单本金20万 + 到期利息4万 + 活期5500元">
+          </label>
         </div>
-        <label class="summary-edit-cell">
-          <span class="summary-label">修改其他资金</span>
-          <input
-            type="number"
-            step="0.01"
-            inputmode="decimal"
-            data-home-bank-cash
-            value="${escapeAttribute(formatInputNumber(state.bankCash, 2))}"
-            placeholder="待填"
-          >
-        </label>
       </section>
-      <div class="account-groups">
+      <div class="holdings-board">
+        <div class="holdings-board-title"><strong>持仓股</strong><span>${escapeHtml(String(state.holdings.length))} 只</span></div>
         ${state.accounts.map((account) => renderAccountSection(account)).join("")}
       </div>
     `;
@@ -681,12 +732,11 @@
     return `
       <section class="account-group">
         <div class="account-group-head">
-          <div>
-            <div class="account-group-title">${escapeHtml(account.name)}</div>
-            <div class="account-group-subtitle">${escapeHtml(account.label)}</div>
-          </div>
+          <div class="account-identity"><strong>${escapeHtml(account.name)}</strong><span>${escapeHtml(account.label)}</span></div>
+          <div class="account-inline-stat"><span>总资产</span><strong>${escapeHtml(summary.totalAssetText)}</strong></div>
+          <div class="account-inline-stat"><span>市值</span><strong>${escapeHtml(summary.marketValueText)}</strong></div>
           <label class="account-cash-inline">
-            <span>可用现金</span>
+            <span>可用资金</span>
             <input
               type="number"
               step="0.01"
@@ -696,15 +746,9 @@
               placeholder="待填"
             >
           </label>
+          <div class="account-inline-stat"><span>总盈亏</span><strong class="${getProfitClass(summary.floatingPnlNumber)}">${escapeHtml(summary.floatingPnlText)}</strong></div>
         </div>
-
-        <div class="account-mini-grid">
-          ${renderSummaryCell("总资产", summary.totalAssetText, "")}
-          ${renderSummaryCell("股票市值", summary.marketValueText, "")}
-          ${renderSummaryCell("可用现金", summary.availableCashText, "")}
-          ${renderSummaryCell("浮盈亏", summary.floatingPnlText, getProfitClass(summary.floatingPnlNumber))}
-        </div>
-
+        <div class="stock-list-head"><span>股票 / 市值</span><span>盈亏</span><span>持仓</span><span>成本 / 现价</span></div>
         <div class="stock-list">
           ${holdings.length ? holdings.map((holding) => renderHoldingItem(holding)).join("") : `<div class="empty-note">当前账户暂无持仓。</div>`}
         </div>
@@ -718,49 +762,21 @@
 
     return `
       <article class="stock-row">
-        <div class="stock-row-top">
-          <div class="stock-identity">
-            <strong>${escapeHtml(holding.name)}</strong>
-            <span>${escapeHtml(holding.code)} · ${escapeHtml(formatShares(holding.shares))}</span>
-          </div>
-          <button class="detail-link-button" type="button" data-open-holding="${escapeAttribute(holding.id)}">详情/编辑</button>
+        <div class="stock-main-line">
+          <button class="stock-identity" type="button" data-open-holding="${escapeAttribute(holding.id)}">
+            <strong>${escapeHtml(holding.name)}</strong><span>${escapeHtml(holding.code)}</span>
+          </button>
+          <strong class="stock-market-value">${escapeHtml(metrics.marketValueText)}</strong>
+          <strong class="${getProfitClass(metrics.floatingPnl)}">${escapeHtml(metrics.floatingPnlText)}</strong>
+          <label class="inline-number"><input type="number" step="100" inputmode="numeric" data-home-shares="${escapeAttribute(holding.id)}" value="${escapeAttribute(formatInputNumber(holding.shares, 0))}" aria-label="${escapeAttribute(holding.name)}持仓股数"><span>股</span></label>
+          <div class="cost-price"><span>${escapeHtml(displayPriceOrPending(holding.cost, "--", 3))}</span><label><input type="number" step="0.001" inputmode="decimal" data-home-price="${escapeAttribute(holding.id)}" value="${escapeAttribute(formatInputNumber(holding.currentPrice, 3))}" placeholder="--" aria-label="${escapeAttribute(holding.name)}当前价"></label></div>
         </div>
-
-        <div class="stock-row-grid">
-          <div class="stock-metric">
-            <span>成本</span>
-            <strong>${escapeHtml(displayPriceOrPending(holding.cost, "待填", 3))}</strong>
-          </div>
-          <label class="stock-metric stock-metric-edit">
-            <span>现价</span>
-            <input
-              type="number"
-              step="0.001"
-              inputmode="decimal"
-              data-home-price="${escapeAttribute(holding.id)}"
-              value="${escapeAttribute(formatInputNumber(holding.currentPrice, 3))}"
-              placeholder="待填"
-            >
-          </label>
-          <div class="stock-metric">
-            <span>市值</span>
-            <strong>${escapeHtml(metrics.marketValueText)}</strong>
-          </div>
-          <div class="stock-metric">
-            <span>浮盈亏</span>
-            <strong class="${getProfitClass(metrics.floatingPnl)}">${escapeHtml(metrics.floatingPnlText)}</strong>
-          </div>
-        </div>
-
-        <div class="stock-row-bottom">
-          <div class="stock-state-inline">
-            <span class="row-label">状态</span>
-            <span class="state-pill">${escapeHtml(holding.status || "待补充")}</span>
-          </div>
-          <div class="stock-next-inline">
-            <span class="row-label">下一步</span>
-            <strong class="next-action-text">${escapeHtml(nextStep.nextActionText)}</strong>
-          </div>
+        <div class="stock-plan-line">
+          <span class="state-pill">${escapeHtml(holding.status || "待补充")}</span>
+          <span class="plan-source">${escapeHtml(nextStep.nextActionSource)}</span>
+          <strong class="next-action-text">${escapeHtml(nextStep.nextActionText)}</strong>
+          <span class="pending-count">未执行 ${escapeHtml(String(nextStep.pendingCount))}</span>
+          <button class="detail-link-button" type="button" data-open-holding="${escapeAttribute(holding.id)}">详情 / 编辑</button>
         </div>
       </article>
     `;
@@ -826,6 +842,7 @@
 
           <div class="detail-next-bar">
             <span class="row-label">下一步计划</span>
+            <span class="plan-source">${escapeHtml(planSummary.nextActionSource)}</span>
             <strong data-live-next-action>${escapeHtml(planSummary.nextActionText)}</strong>
           </div>
         </div>
@@ -933,13 +950,70 @@
 
   function renderPlansTab(holding) {
     const grouped = groupPlansByKind(holding.id);
+    const plans = getPlansForHolding(holding.id);
     return `
       <section class="detail-panel-block">
         ${renderPlanGroup(holding.id, PLAN_KIND.SELL, grouped[PLAN_KIND.SELL], "计划卖出", "最终退出、减仓或达到目标价卖出")}
         ${renderPlanGroup(holding.id, PLAN_KIND.TRADE, grouped[PLAN_KIND.TRADE], "计划做T", "记录同一波段可重复执行的高卖低买")}
         ${renderPlanGroup(holding.id, PLAN_KIND.ADD, grouped[PLAN_KIND.ADD], "计划补仓", "未来低位买入计划，必须写清补仓后用途")}
         ${grouped[PLAN_KIND.WATCH].length ? renderWatchGroup(grouped[PLAN_KIND.WATCH]) : ""}
+        ${renderExecutionSections(plans)}
       </section>
+    `;
+  }
+
+  function renderExecutionSections(plans) {
+    const active = plans.filter((plan) => plan.status === PLAN_STATUS.WAITING);
+    const completed = plans.filter((plan) => plan.status === PLAN_STATUS.DONE);
+    return `
+      <div class="execution-section">
+        <div class="section-head compact"><div><h3>已进行</h3><p>已触发待执行，或已经卖出、尚未买回的计划</p></div><span class="record-count">${active.length}</span></div>
+        <div class="execution-list">
+          ${active.length ? active.map((plan, index) => renderActiveExecution(plan, index)).join("") : `<div class="empty-note">暂无进行中的执行记录。</div>`}
+        </div>
+      </div>
+      <div class="execution-section">
+        <div class="section-head compact"><div><h3>已完成</h3><p>已形成完整闭环的交易记录</p></div><span class="record-count">${completed.length}</span></div>
+        <div class="execution-list">
+          ${completed.length ? completed.map((plan, index) => renderCompletedExecution(plan, index)).join("") : `<div class="empty-note">暂无已完成记录。</div>`}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderActiveExecution(plan, index) {
+    const price = coalesceNumber(plan.actualSellPrice, plan.actualBuyPrice, plan.sellPrice, plan.buyPrice);
+    const shares = coalesceNumber(plan.sellShares, plan.buyShares);
+    const type = plan.kind === PLAN_KIND.TRADE ? (Number.isFinite(plan.actualSellPrice) ? "T卖出" : "T买回") : (plan.kind === PLAN_KIND.SELL ? "卖出" : "补仓");
+    return `
+      <div class="execution-row">
+        <span class="execution-index">${index + 1}</span><strong>${escapeHtml(type)}</strong>
+        <span><small>执行价</small>${escapeHtml(formatPriceOrPending(price))}</span>
+        <span><small>股数</small>${escapeHtml(formatSharesOrPending(shares))}</span>
+        <span><small>金额</small>${escapeHtml(formatCurrencyOrPending(computeAmount(price, shares)))}</span>
+        <span class="execution-note">${escapeHtml(plan.note || "--")}</span>
+        <span class="execution-status">${escapeHtml(plan.status)}</span>
+      </div>
+    `;
+  }
+
+  function renderCompletedExecution(plan, index) {
+    const sellPrice = coalesceNumber(plan.actualSellPrice, plan.sellPrice);
+    const buyPrice = coalesceNumber(plan.actualBuyPrice, plan.buyPrice);
+    const shares = coalesceNumber(plan.sellShares, plan.buyShares);
+    const profit = Number.isFinite(plan.actualProfit) ? plan.actualProfit : (Number.isFinite(sellPrice) && Number.isFinite(buyPrice) && Number.isFinite(shares) ? (sellPrice - buyPrice) * shares : null);
+    const rate = Number.isFinite(sellPrice) && Number.isFinite(buyPrice) && buyPrice !== 0 ? (sellPrice - buyPrice) / buyPrice * 100 : null;
+    return `
+      <div class="execution-row completed">
+        <span class="execution-index">${index + 1}</span><strong>${escapeHtml(planKindLabels[plan.kind] || "交易")}</strong>
+        <span><small>卖出价</small>${escapeHtml(formatPriceOrPending(sellPrice))}</span>
+        <span><small>股数</small>${escapeHtml(formatSharesOrPending(shares))}</span>
+        <span><small>卖出总价</small>${escapeHtml(formatCurrencyOrPending(computeAmount(sellPrice, shares)))}</span>
+        <span><small>买入价</small>${escapeHtml(formatPriceOrPending(buyPrice))}</span>
+        <span class="${getProfitClass(profit)}"><small>盈利率</small>${Number.isFinite(rate) ? `${rate >= 0 ? "+" : ""}${rate.toFixed(2)}%` : "--"}</span>
+        <span class="${getProfitClass(profit)}"><small>实际盈利</small>${escapeHtml(formatProfitOrPending(profit))}</span>
+        <span class="execution-note">${escapeHtml(plan.note || "--")}</span>
+      </div>
     `;
   }
 
@@ -1018,9 +1092,17 @@
             <span>预计卖出金额</span>
             <strong data-live-sell-amount>${escapeHtml(formatCurrencyOrPending(computeSellAmount(plan)))}</strong>
           </div>
+          <div class="editor-stat">
+            <span>预计盈利</span>
+            <strong class="${getProfitClass(computeSellExpectedProfit(plan))}">${escapeHtml(formatProfitOrPending(computeSellExpectedProfit(plan)))}</strong>
+          </div>
           <label class="editor-field">
             <span>状态</span>
             <select data-field="status">${renderPlanStatusOptions(plan.status)}</select>
+          </label>
+          <label class="editor-field">
+            <span>实际卖出价</span>
+            <input type="number" step="0.001" inputmode="decimal" data-field="actualSellPrice" value="${escapeAttribute(formatInputNumber(plan.actualSellPrice, 3))}" placeholder="可空">
           </label>
           <label class="editor-field full">
             <span>计划目的</span>
@@ -1121,6 +1203,10 @@
           <label class="editor-field">
             <span>状态</span>
             <select data-field="status">${renderPlanStatusOptions(plan.status)}</select>
+          </label>
+          <label class="editor-field">
+            <span>实际买入价</span>
+            <input type="number" step="0.001" inputmode="decimal" data-field="actualBuyPrice" value="${escapeAttribute(formatInputNumber(plan.actualBuyPrice, 3))}" placeholder="可空">
           </label>
           <label class="editor-field full">
             <span>补仓后用途</span>
@@ -1523,7 +1609,8 @@
       availableCashText: formatCurrencyOrPending(availableCash),
       otherFundsText: formatCurrencyOrPending(otherFunds),
       floatingPnlText: formatProfitOrPending(floatingPnl, "¥0"),
-      floatingPnlNumber: floatingPnl
+      floatingPnlNumber: floatingPnl,
+      positionText: marketValue + availableCash > 0 ? `${(marketValue / (marketValue + availableCash) * 100).toFixed(1)}%` : "--"
     };
   }
 
@@ -1548,9 +1635,11 @@
     const nextCandidate = pickBestCandidate(candidates);
     return {
       hasNextPlan: Boolean(nextCandidate),
-      nextActionText: nextCandidate ? nextCandidate.text : "暂无计划",
+      nextActionText: nextCandidate ? nextCandidate.text : "暂无",
+      nextActionSource: nextCandidate ? nextCandidate.source : "无计划",
       nextPlanStatus: nextCandidate ? nextCandidate.status : "",
-      candidatePrice: nextCandidate ? nextCandidate.price : null
+      candidatePrice: nextCandidate ? nextCandidate.price : null,
+      pendingCount: plans.filter((plan) => activePlanStatuses.has(plan.status)).length
     };
   }
 
@@ -1564,6 +1653,8 @@
         id: `${plan.id}-sell`,
         planId: plan.id,
         status: plan.status,
+        kind: plan.kind,
+        source: planKindLabels[plan.kind],
         price: plan.sellPrice,
         distance: computePriceDistance(currentPrice, plan.sellPrice),
         text: buildSellPlanLabel(plan)
@@ -1575,6 +1666,8 @@
         id: `${plan.id}-add`,
         planId: plan.id,
         status: plan.status,
+        kind: plan.kind,
+        source: planKindLabels[plan.kind],
         price: plan.buyPrice,
         distance: computePriceDistance(currentPrice, plan.buyPrice),
         text: buildAddPlanLabel(plan)
@@ -1588,6 +1681,8 @@
           id: `${plan.id}-t-sell`,
           planId: plan.id,
           status: plan.status,
+          kind: plan.kind,
+          source: planKindLabels[plan.kind],
           price: plan.sellPrice,
           distance: computePriceDistance(currentPrice, plan.sellPrice),
           text: buildTradeLegLabel("T卖出", plan.sellPrice, plan.sellShares)
@@ -1598,6 +1693,8 @@
           id: `${plan.id}-t-buy`,
           planId: plan.id,
           status: plan.status,
+          kind: plan.kind,
+          source: planKindLabels[plan.kind],
           price: plan.buyPrice,
           distance: computePriceDistance(currentPrice, plan.buyPrice),
           text: buildTradeLegLabel("T买回", plan.buyPrice, plan.buyShares)
@@ -1606,14 +1703,7 @@
       return list;
     }
 
-    return [{
-      id: `${plan.id}-watch`,
-      planId: plan.id,
-      status: plan.status,
-      price: plan.triggerPrice,
-      distance: computePriceDistance(currentPrice, plan.triggerPrice),
-      text: getWatchPlanLabel(plan)
-    }];
+    return [];
   }
 
   function pickBestCandidate(candidates) {
@@ -1625,6 +1715,16 @@
       const waitingDiff = Number(right.status === PLAN_STATUS.WAITING) - Number(left.status === PLAN_STATUS.WAITING);
       if (waitingDiff !== 0) {
         return waitingDiff;
+      }
+
+      const kindPriority = {
+        [PLAN_KIND.TRADE]: 1,
+        [PLAN_KIND.ADD]: 2,
+        [PLAN_KIND.SELL]: 3
+      };
+      const kindDiff = (kindPriority[left.kind] || 99) - (kindPriority[right.kind] || 99);
+      if (kindDiff !== 0) {
+        return kindDiff;
       }
 
       const leftPriced = Number.isFinite(left.price);
@@ -1765,6 +1865,29 @@
     return state.positionLots.filter((lot) => lot.holdingId === holdingId);
   }
 
+  function updateHoldingSharesFromHome(holding, nextShares) {
+    const currentShares = Number(holding.shares || 0);
+    const difference = Number(nextShares || 0) - currentShares;
+    if (!difference) {
+      return;
+    }
+
+    state.positionLots.push(normalizePositionLot({
+      id: `${holding.id}-home-adjust-${Date.now()}`,
+      holdingId: holding.id,
+      side: difference > 0 ? POSITION_SIDE.BUY : POSITION_SIDE.SELL,
+      label: "首页手动调整",
+      price: holding.cost,
+      shares: Math.abs(difference),
+      note: "由首页直接修改持仓股数",
+      createdAt: formatDateTime(new Date()),
+      source: "home"
+    }));
+
+    const synced = syncHoldingFromPositionLots(holding, getPositionLotsForHolding(holding.id));
+    Object.assign(holding, synced);
+  }
+
   function getHoldingMarketValueNumber(holding) {
     if (Number.isFinite(holding.currentPrice) && Number.isFinite(holding.shares)) {
       return holding.shares * holding.currentPrice;
@@ -1777,7 +1900,7 @@
 
   function getHoldingFloatingPnl(holding) {
     if (Number.isFinite(holding.currentPrice) && Number.isFinite(holding.cost) && Number.isFinite(holding.shares)) {
-      return holding.shares * holding.currentPrice - holding.shares * holding.cost;
+      return holding.shares * holding.currentPrice - holding.shares * holding.cost + (Number(holding.floatingPnlAdjustment) || 0);
     }
     if (Number.isFinite(holding.floatingPnlOverride)) {
       return holding.floatingPnlOverride;
@@ -1797,6 +1920,7 @@
     const raw = source && typeof source === "object" ? source : {};
     const holdings = normalizeHoldings(raw.holdings);
     return finalizeState({
+      dataRevision: currentDataRevision,
       bankCash: parseNullableNumber(raw.bankCash),
       accounts: normalizeAccounts(raw.accounts),
       holdings,
@@ -1807,6 +1931,7 @@
 
   function finalizeState(inputState) {
     const nextState = {
+      dataRevision: currentDataRevision,
       bankCash: parseNullableNumber(inputState.bankCash),
       accounts: normalizeAccounts(inputState.accounts),
       holdings: normalizeHoldings(inputState.holdings),
@@ -1823,6 +1948,7 @@
 
   function mergeState(baseState, overrideState) {
     return finalizeState({
+      dataRevision: currentDataRevision,
       bankCash: overrideState.bankCash === null ? baseState.bankCash : overrideState.bankCash,
       accounts: mergeArrayById(baseState.accounts, overrideState.accounts, mergeAccount),
       holdings: mergeArrayById(baseState.holdings, overrideState.holdings, mergeHolding),
@@ -1909,7 +2035,8 @@
       extraNote: String((source && source.extraNote) || "").trim(),
       reflectionNote: normalizeNoteText(source && source.reflectionNote),
       marketValueOverride: parseNullableNumber(source && source.marketValueOverride),
-      floatingPnlOverride: parseNullableNumber(source && source.floatingPnlOverride)
+      floatingPnlOverride: parseNullableNumber(source && source.floatingPnlOverride),
+      floatingPnlAdjustment: parseNullableNumber(source && source.floatingPnlAdjustment) || 0
     };
   }
 
@@ -2127,6 +2254,14 @@
 
   function computeSellAmount(plan) {
     return computeAmount(plan.sellPrice, plan.sellShares);
+  }
+
+  function computeSellExpectedProfit(plan) {
+    const holding = getHoldingById(plan.holdingId);
+    if (!holding || !Number.isFinite(holding.cost) || !Number.isFinite(plan.sellPrice) || !Number.isFinite(plan.sellShares)) {
+      return null;
+    }
+    return (plan.sellPrice - holding.cost) * plan.sellShares;
   }
 
   function computeBuyAmount(plan) {

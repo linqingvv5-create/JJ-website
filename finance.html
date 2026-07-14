@@ -4,7 +4,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="交易驾驶舱">
-  <meta name="theme-color" content="#f3f4f6">
+  <meta name="theme-color" content="#e53935">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="app-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-icon.svg">
@@ -17,23 +17,16 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="topbar-main">
-        <button id="back-button" class="back-button hidden" type="button">返回模块首页</button>
+        <button id="back-button" class="back-button hidden" type="button" aria-label="返回">‹</button>
 
         <div class="brand-block">
-          <h1 id="page-title">林青交易看板</h1>
+          <h1 id="page-title">林青投资系统</h1>
           <p class="subtitle" id="page-subtitle">打开网页就能查看持仓、现金、计划和下一步动作。</p>
-          <p class="sync-status sync-status-checking" id="sync-status">正在检查云端同步状态...</p>
         </div>
+        <p class="sync-status sync-status-checking" id="sync-status">检查同步...</p>
       </div>
 
-      <div class="header-actions">
-        <button id="view-toggle-btn" class="secondary-button" type="button">紧凑版</button>
-        <a class="secondary-button" href="./">返回总首页</a>
-        <button id="reset-data-btn" class="secondary-button" type="button">重置为初始数据</button>
-        <button id="export-data-btn" class="secondary-button" type="button">导出 JSON</button>
-        <button id="import-data-btn" class="primary-button" type="button">导入 JSON</button>
-        <input id="import-file" type="file" accept="application/json" hidden>
-      </div>
+      <button id="reset-data-btn" class="topbar-reset" type="button">重置</button>
     </header>
 
     <main class="page-content">
@@ -45,6 +38,15 @@
         <div id="detail-content"></div>
       </section>
     </main>
+
+    <nav class="quick-actions" aria-label="快捷功能">
+      <button type="button" data-quick-target="holdings"><span>▤</span>持仓管理</button>
+      <button type="button" data-quick-target="plans"><span>◎</span>交易计划</button>
+      <button type="button" data-quick-target="funds"><span>¥</span>资金管理</button>
+      <button id="export-data-btn" type="button"><span>⇩</span>导出 JSON</button>
+      <button id="import-data-btn" type="button"><span>⇧</span>导入 JSON</button>
+      <input id="import-file" type="file" accept="application/json" hidden>
+    </nav>
   </div>
 
   <script src="data.js"></script>
