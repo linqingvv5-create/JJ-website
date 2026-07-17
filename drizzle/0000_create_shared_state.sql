@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS shared_state (
+  id TEXT PRIMARY KEY NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 0,
+  saved_at TEXT,
+  body TEXT NOT NULL
+);

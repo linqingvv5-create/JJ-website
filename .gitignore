@@ -2,3 +2,5 @@ __pycache__/
 state.json
 .wrangler/
 .dev.vars
+dist/
+.site-package.tar.gz
