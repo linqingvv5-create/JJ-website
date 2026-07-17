@@ -28,18 +28,18 @@
     syncStatus: document.getElementById("sync-status"),
     back: document.getElementById("back-button"),
     reset: document.getElementById("reset-data-btn"),
-    export: document.getElementById("export-data-btn"),
-    import: document.getElementById("import-data-btn"),
-    importFile: document.getElementById("import-file"),
     home: document.getElementById("home-view"),
     detail: document.getElementById("detail-view"),
+    funds: document.getElementById("funds-view"),
     accountList: document.getElementById("account-list"),
-    detailContent: document.getElementById("detail-content")
+    detailContent: document.getElementById("detail-content"),
+    fundsContent: document.getElementById("funds-content")
   };
 
   const defaultState = normalizeState(window.APP_DATA || {});
   let state = loadState();
   let selectedHoldingId = null;
+  let fundsOpen = false;
   let selectedTab = TAB.BUY;
   let saveTimer = 0;
   let cloudSaveTimer = 0;
@@ -64,10 +64,6 @@
       saveState();
       closeDetail();
     });
-    els.export.addEventListener("click", exportJson);
-    els.import.addEventListener("click", () => els.importFile.click());
-    els.importFile.addEventListener("change", importJson);
-
     els.accountList.addEventListener("click", handleHomeClick);
     els.accountList.addEventListener("input", handleHomeInput);
     els.accountList.addEventListener("change", handleHomeInput);
@@ -79,12 +75,13 @@
     els.detailContent.addEventListener("click", handleDetailClick);
     els.detailContent.addEventListener("input", handleDetailInput);
     els.detailContent.addEventListener("change", handleDetailInput);
+    els.fundsContent.addEventListener("click", handleFundsClick);
 
     document.querySelectorAll("[data-quick-target]").forEach((button) => {
       button.addEventListener("click", () => {
         const target = button.dataset.quickTarget;
-        if (target === "funds") document.querySelector(".dashboard-summary")?.scrollIntoView({ behavior: "smooth" });
-        if (target === "holdings") document.querySelector(".holdings-board")?.scrollIntoView({ behavior: "smooth" });
+        if (target === "funds") openFundsManagement();
+        if (target === "holdings") { fundsOpen = false; selectedHoldingId = null; render(); window.scrollTo({ top: 0, behavior: "smooth" }); }
         if (target === "plans" && selectedHoldingId) openHolding(selectedHoldingId, TAB.BUY);
       });
     });
@@ -287,6 +284,7 @@
   }
 
   function openHolding(holdingId, tab) {
+    fundsOpen = false;
     selectedHoldingId = holdingId;
     selectedTab = tab || TAB.BUY;
     render();
@@ -299,6 +297,7 @@
   }
 
   function closeDetail() {
+    fundsOpen = false;
     selectedHoldingId = null;
     selectedTab = TAB.BUY;
     render();
@@ -306,14 +305,106 @@
 
   function render() {
     const holding = getHolding(selectedHoldingId);
-    els.pageTitle.textContent = holding ? holding.name : "林青投资系统";
-    els.pageSubtitle.textContent = holding ? `${holding.code} · 计划与执行` : "持仓、盈亏与下一步计划";
+    els.pageTitle.textContent = fundsOpen ? "资金管理" : holding ? holding.name : "林青投资系统";
+    els.pageSubtitle.textContent = fundsOpen ? "资金总览、账户与账本" : holding ? `${holding.code} · 计划与执行` : "持仓、盈亏与下一步计划";
     if (!cloudReady) els.syncStatus.textContent = "连接云端…";
-    els.back.classList.toggle("hidden", !holding);
-    els.home.classList.toggle("is-active", !holding);
-    els.detail.classList.toggle("is-active", Boolean(holding));
+    els.back.classList.toggle("hidden", !holding && !fundsOpen);
+    els.home.classList.toggle("is-active", !holding && !fundsOpen);
+    els.detail.classList.toggle("is-active", Boolean(holding) && !fundsOpen);
+    els.funds.classList.toggle("is-active", fundsOpen);
     renderHome();
     renderDetail();
+    renderFundsManagement();
+  }
+
+  function openFundsManagement() {
+    selectedHoldingId = null;
+    fundsOpen = true;
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function renderFundsManagement() {
+    if (!fundsOpen) return;
+    recalculateAllHoldings();
+    const totalMarket = sum(state.holdings.map(marketValue));
+    const securityCash = sum(state.accounts.map((account) => account.availableCash));
+    const bankCash = Number(state.bankCash) || 0;
+    const totalAssets = totalMarket + securityCash + bankCash;
+    const entries = [...(state.ledgerEntries || [])].sort((a, b) => String(b.createdAt || b.date).localeCompare(String(a.createdAt || a.date)));
+    els.fundsContent.innerHTML = `
+      <div class="funds-page">
+        <section class="funds-summary-strip">
+          <div><span>总资产</span><strong>${wholeCurrency(totalAssets)}</strong></div>
+          <div><span>证券市值</span><strong>${wholeCurrency(totalMarket)}</strong></div>
+          <div><span>可用资金</span><strong>${wholeCurrency(securityCash)}</strong></div>
+          <div><span>银行资金</span><strong>${wholeCurrency(bankCash)}</strong></div>
+        </section>
+        <section class="funds-section">
+          <div class="funds-section-head"><div><strong>账户</strong><span>证券账户与银行资金</span></div></div>
+          <div class="fund-account-list">
+            ${state.accounts.map((account) => {
+              const holdings = state.holdings.filter((holding) => holding.accountId === account.id);
+              const market = sum(holdings.map(marketValue));
+              return `<div class="fund-account-row"><div><strong>${html(account.name)}</strong><span>市值 ${wholeCurrency(market)}</span></div><div><span>可用资金</span><strong>${wholeCurrency(account.availableCash)}</strong></div><button type="button" data-fund-transfer="${attr(account.id)}">转入/转出</button></div>`;
+            }).join("")}
+            <div class="fund-account-row bank-account-row"><div><strong>银行资金</strong><span>活期、大额存单等</span></div><div><span>当前合计</span><strong>${wholeCurrency(bankCash)}</strong></div><button type="button" data-edit-bank-funds>调整</button></div>
+          </div>
+        </section>
+        <section class="funds-section ledger-section">
+          <div class="funds-section-head"><div><strong>账本</strong><span>收入、支出、转入和转出记录</span></div><button type="button" data-add-ledger>＋记一笔</button></div>
+          <div class="ledger-list">${entries.length ? entries.map(renderLedgerEntry).join("") : `<div class="ledger-empty">暂无记录，点击“记一笔”开始。</div>`}</div>
+        </section>
+      </div>`;
+  }
+
+  function renderLedgerEntry(entry) {
+    const incoming = ["收入", "转入", "利息"].includes(entry.type);
+    return `<div class="ledger-row"><div class="ledger-date"><strong>${html(entry.date || "")}</strong><span>${html(entry.type || "记录")}</span></div><div class="ledger-copy"><strong>${html(entry.accountName || "未分类账户")}</strong><span>${html(entry.note || "--")}</span></div><strong class="ledger-amount ${incoming ? "profit-positive" : "profit-negative"}">${incoming ? "+" : "-"}${wholeCurrency(Math.abs(Number(entry.amount) || 0))}</strong><button type="button" data-delete-ledger="${attr(entry.id)}" aria-label="删除记录">×</button></div>`;
+  }
+
+  function handleFundsClick(event) {
+    const transfer = event.target.closest("[data-fund-transfer]");
+    if (transfer) { openBankTransfer(transfer.dataset.fundTransfer); return; }
+    if (event.target.closest("[data-edit-bank-funds]")) { openBankFundsEditor(); return; }
+    if (event.target.closest("[data-add-ledger]")) { openLedgerEditor(); return; }
+    const remove = event.target.closest("[data-delete-ledger]");
+    if (remove && window.confirm("删除这条账本记录吗？")) {
+      state.ledgerEntries = (state.ledgerEntries || []).filter((item) => item.id !== remove.dataset.deleteLedger);
+      saveState();
+      renderFundsManagement();
+    }
+  }
+
+  function openLedgerEditor() {
+    document.querySelector(".stock-modal-backdrop")?.remove();
+    const backdrop = document.createElement("div");
+    backdrop.className = "stock-modal-backdrop";
+    backdrop.innerHTML = `<form class="stock-modal ledger-modal"><div class="stock-modal-title"><strong>账本 · 记一笔</strong><button type="button" data-close-stock-modal>×</button></div><div class="stock-modal-grid"><label><span>日期</span><input name="date" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label><label><span>类型</span><select name="type"><option>支出</option><option>收入</option><option>转入</option><option>转出</option><option>利息</option></select></label><label><span>账户</span><select name="accountId">${state.accounts.map((account) => `<option value="${attr(account.id)}">${html(account.name)}</option>`).join("")}<option value="bank">银行资金</option></select></label><label><span>金额</span><input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required></label><label class="stock-modal-wide"><span>备注</span><input name="note" type="text" placeholder="用途或说明"></label></div><div class="stock-modal-actions"><button type="button" data-close-stock-modal>取消</button><button type="submit">保存</button></div></form>`;
+    document.body.appendChild(backdrop);
+    document.body.classList.add("modal-open");
+    const close = () => { backdrop.remove(); document.body.classList.remove("modal-open"); };
+    backdrop.addEventListener("click", (event) => { if (event.target === backdrop || event.target.closest("[data-close-stock-modal]")) close(); });
+    backdrop.querySelector("form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const values = new FormData(event.currentTarget);
+      const accountId = String(values.get("accountId") || "bank");
+      const account = state.accounts.find((item) => item.id === accountId);
+      state.ledgerEntries.unshift(normalizeLedgerEntry({ id: `ledger-${Date.now()}`, date: values.get("date"), type: values.get("type"), accountId, accountName: account?.name || "银行资金", amount: Number(values.get("amount")), note: values.get("note"), createdAt: new Date().toISOString() }));
+      saveState();
+      close();
+      renderFundsManagement();
+    });
+  }
+
+  function openBankFundsEditor() {
+    const next = window.prompt("请输入银行资金合计（元）", String(Number(state.bankCash) || 0));
+    if (next == null) return;
+    const value = Number(next);
+    if (!Number.isFinite(value) || value < 0) return;
+    state.bankCash = value;
+    saveState();
+    renderFundsManagement();
   }
 
   function renderHome() {
@@ -1103,7 +1194,21 @@
       positionLots: lots,
       plans,
       tradeHistory: (raw.tradeHistory || []).map(normalizeHistory),
-      completedSales
+      completedSales,
+      ledgerEntries: (raw.ledgerEntries || []).map(normalizeLedgerEntry)
+    };
+  }
+
+  function normalizeLedgerEntry(raw) {
+    return {
+      id: String(raw.id || `ledger-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`),
+      date: String(raw.date || new Date().toISOString().slice(0, 10)),
+      type: String(raw.type || "记录"),
+      accountId: String(raw.accountId || "bank"),
+      accountName: String(raw.accountName || "未分类账户"),
+      amount: Math.abs(Number(raw.amount) || 0),
+      note: String(raw.note || ""),
+      createdAt: String(raw.createdAt || new Date().toISOString())
     };
   }
 
@@ -1263,9 +1368,11 @@
         return;
       }
       account.availableCash = currentCash + (isTransferOut ? -amountValue : amountValue);
+      state.ledgerEntries.unshift(normalizeLedgerEntry({ id: `ledger-transfer-${Date.now()}`, date: new Date().toISOString().slice(0, 10), type: isTransferOut ? "转出" : "转入", accountId: account.id, accountName: account.name, amount: amountValue, note: "证券账户资金变动", createdAt: new Date().toISOString() }));
       saveState();
       close();
       renderHome();
+      renderFundsManagement();
     });
     backdrop.querySelector("input[name='amount']")?.focus();
   }

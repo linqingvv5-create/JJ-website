@@ -5,13 +5,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="交易驾驶舱">
   <meta name="theme-color" content="#e53935">
-  <link rel="manifest" href="finance-manifest.webmanifest?v=20260717-27">
+  <link rel="manifest" href="finance-manifest.webmanifest?v=20260717-28">
   <link rel="icon" href="app-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-icon.svg">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>林青交易驾驶舱</title>
-  <link rel="stylesheet" href="style.css?v=20260717-27">
+  <link rel="stylesheet" href="style.css?v=20260717-28">
 </head>
 <body>
   <div class="app-shell">
@@ -37,20 +37,21 @@
       <section id="detail-view" class="view">
         <div id="detail-content"></div>
       </section>
+
+      <section id="funds-view" class="view">
+        <div id="funds-content"></div>
+      </section>
     </main>
 
     <nav class="quick-actions" aria-label="快捷功能">
       <button type="button" data-quick-target="holdings"><span>▤</span>持仓管理</button>
       <button type="button" data-quick-target="plans"><span>◎</span>交易计划</button>
       <button type="button" data-quick-target="funds"><span>¥</span>资金管理</button>
-      <button id="export-data-btn" type="button"><span>⇩</span>导出 JSON</button>
-      <button id="import-data-btn" type="button"><span>⇧</span>导入 JSON</button>
-      <input id="import-file" type="file" accept="application/json" hidden>
     </nav>
   </div>
 
-  <script src="data.js?v=20260717-27"></script>
+  <script src="data.js?v=20260717-28"></script>
   <script src="sync-auth.js"></script>
-  <script src="trade-board.js?v=20260717-27"></script>
+  <script src="trade-board.js?v=20260717-28"></script>
 </body>
 </html>

@@ -192,7 +192,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--r
   bottom: 0;
   z-index: 60;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   width: min(100%, 980px);
   min-height: calc(54px + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
@@ -1048,4 +1048,38 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--r
   font-weight: 400 !important;
   letter-spacing: 0 !important;
   line-height: 14px !important;
+}
+
+/* Funds management */
+.funds-page { min-height: calc(100vh - 110px); padding-bottom: 12px; background: #f3f4f5; }
+.funds-summary-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: #fff; border-bottom: 7px solid #f3f4f5; }
+.funds-summary-strip > div { min-width: 0; padding: 10px 5px; border-right: 1px solid var(--line); text-align: center; }
+.funds-summary-strip > div:last-child { border-right: 0; }
+.funds-summary-strip span { display: block; overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.funds-summary-strip strong { display: block; margin-top: 4px; overflow: hidden; font-size: 13px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.funds-section { margin-bottom: 7px; background: #fff; }
+.funds-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+.funds-section-head > div { display: grid; gap: 2px; }
+.funds-section-head strong { font-size: 13px; }
+.funds-section-head span { color: var(--muted); font-size: 9px; }
+.funds-section-head button, .fund-account-row button { padding: 4px 7px; border: 1px solid #b7cee7; border-radius: 2px; color: #27689d; background: #f7fbff; font-size: 9px; }
+.fund-account-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, .9fr) auto; align-items: center; gap: 7px; min-height: 51px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.fund-account-row:last-child { border-bottom: 0; }
+.fund-account-row > div { display: grid; gap: 3px; min-width: 0; }
+.fund-account-row > div:nth-child(2) { text-align: right; }
+.fund-account-row strong { overflow: hidden; font-size: 11px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.fund-account-row span { overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.ledger-list { padding: 0 10px; }
+.ledger-row { display: grid; grid-template-columns: 65px minmax(0, 1fr) auto 18px; align-items: center; gap: 7px; min-height: 48px; border-bottom: 1px solid var(--line); }
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-date, .ledger-copy { display: grid; gap: 2px; min-width: 0; }
+.ledger-date strong, .ledger-copy strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.ledger-date span, .ledger-copy span { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.ledger-amount { font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.ledger-row > button { padding: 0; border: 0; color: #9ba0a6; background: transparent; font-size: 14px; }
+.ledger-empty { padding: 18px 8px; color: var(--muted); font-size: 10px; text-align: center; }
+
+@media (max-width: 520px) {
+  .funds-summary-strip strong { font-size: 11px; }
+  .funds-summary-strip > div { padding-right: 2px; padding-left: 2px; }
 }
