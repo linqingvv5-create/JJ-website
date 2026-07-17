@@ -23,6 +23,7 @@ $assets = @(
   'trade-board.js',
   'sync-auth.js',
   'manifest.webmanifest',
+  'finance-manifest.webmanifest',
   'app-icon.svg'
 )
 foreach ($asset in $assets) {

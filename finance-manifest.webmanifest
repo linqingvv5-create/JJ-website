@@ -1,0 +1,26 @@
+{
+  "id": "./finance.html",
+  "name": "林青交易驾驶舱",
+  "short_name": "交易驾驶舱",
+  "description": "手机与电脑同步使用的股票持仓和交易计划面板。",
+  "start_url": "./finance.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#e53935",
+  "icons": [
+    {
+      "src": "./app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "打开交易面板",
+      "short_name": "交易面板",
+      "url": "./finance.html"
+    }
+  ]
+}
