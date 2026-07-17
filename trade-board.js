@@ -4,7 +4,10 @@
   const STORAGE_KEY = "linqing-trade-board-excel-v1";
   const LEGACY_STORAGE_KEY = "linqing-minimal-trade-board-state-v4";
   const DATA_REVISION = "2026-07-17-mobile-sync-1";
-  const SYNC_API_STATE_URL = "/api/state";
+  const SYNC_SERVICE_ORIGIN = window.location.hostname.endsWith("github.io")
+    ? "https://linqing-trading-dashboard.linqingvv5.chatgpt.site"
+    : "";
+  const SYNC_API_STATE_URL = `${SYNC_SERVICE_ORIGIN}/api/state`;
   const SYNC_POLL_INTERVAL_MS = 5000;
 
   const KIND = { BUY: "buy", ADD: "add", SELL: "sell", TRADE: "trade", WATCH: "watch" };

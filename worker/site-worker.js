@@ -5,13 +5,30 @@ const SCHEMA_SQL = `CREATE TABLE IF NOT EXISTS shared_state (
   body TEXT NOT NULL
 )`;
 
-function json(data, status = 200) {
+const ALLOWED_ORIGINS = new Set([
+  "https://linqingvv5-create.github.io",
+  "https://linqing-trading-dashboard.linqingvv5.chatgpt.site"
+]);
+
+function apiHeaders(request) {
+  const origin = request.headers.get("origin");
+  const headers = {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+    "vary": "Origin"
+  };
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    headers["access-control-allow-origin"] = origin;
+    headers["access-control-allow-methods"] = "GET, POST, OPTIONS";
+    headers["access-control-allow-headers"] = "Content-Type";
+  }
+  return headers;
+}
+
+function json(data, status = 200, request) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store"
-    }
+    headers: apiHeaders(request)
   });
 }
 
@@ -31,7 +48,7 @@ async function readState(db) {
 async function writeState(request, db) {
   const payload = await request.json();
   if (!payload || !payload.state || typeof payload.state !== "object" || Array.isArray(payload.state)) {
-    return json({ error: "state must be an object" }, 400);
+    return json({ error: "state must be an object" }, 400, request);
   }
   await ensureSchema(db);
   const previous = await db.prepare("SELECT revision FROM shared_state WHERE id = ?1").bind("board-state").first();
@@ -41,7 +58,7 @@ async function writeState(request, db) {
     VALUES (?1, ?2, ?3, ?4)
     ON CONFLICT(id) DO UPDATE SET revision = excluded.revision, saved_at = excluded.saved_at, body = excluded.body`)
     .bind("board-state", revision, savedAt, JSON.stringify(payload.state)).run();
-  return json({ revision, savedAt, state: payload.state });
+  return json({ revision, savedAt, state: payload.state }, 200, request);
 }
 
 export default {
@@ -49,14 +66,15 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/api/state") {
       try {
-        if (request.method === "GET") return json(await readState(env.DB));
+        if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: apiHeaders(request) });
+        if (request.method === "GET") return json(await readState(env.DB), 200, request);
         if (request.method === "POST") return await writeState(request, env.DB);
-        return new Response("Method Not Allowed", { status: 405, headers: { allow: "GET, POST" } });
+        return new Response("Method Not Allowed", { status: 405, headers: { ...apiHeaders(request), allow: "GET, POST, OPTIONS" } });
       } catch (error) {
-        return json({ error: error instanceof Error ? error.message : "同步服务异常" }, 500);
+        return json({ error: error instanceof Error ? error.message : "同步服务异常" }, 500, request);
       }
     }
-    if (url.pathname === "/api/health") return json({ ok: true });
+    if (url.pathname === "/api/health") return json({ ok: true }, 200, request);
     const assetUrl = new URL(request.url);
     if (assetUrl.pathname === "/") assetUrl.pathname = "/finance.html";
     return env.ASSETS.fetch(new Request(assetUrl, request));
