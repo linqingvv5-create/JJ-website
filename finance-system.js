@@ -65,10 +65,18 @@
   let saveTimer = 0;
   let toastTimer = 0;
   let navPreference = loadNavPreference();
+  let sharedRevision = 0;
+  let personalRevision = 0;
+  let cloudBusy = false;
+  let realtimeChannel = null;
 
-  bindEvents();
-  navigateRoute(parseRoute());
-  void loadRemoteState();
+  if (location.protocol === "file:" || !window.FinanceAuth) {
+    bindEvents();
+    navigateRoute(parseRoute());
+    void loadRemoteState();
+  } else {
+    void initializeAuthenticatedFinance();
+  }
 
   function defaultState() {
     const now = new Date().toISOString();
@@ -105,7 +113,9 @@
       ],
       goalEntries: [],
       assetSnapshots: [],
-      investmentSummaries: []
+      investmentSummaries: [],
+      memberAssetSummaries: [],
+      memberMonthlySummaries: []
     };
   }
 
@@ -328,6 +338,7 @@
           <button type="button" data-open-view="ledger"><span>我的账本</span><b>查看个人与家庭明细 ›</b></button>
           <button type="button" data-open-view="accounts"><span>我的账户</span><b>余额与本月资金流 ›</b></button>
           <button type="button" data-open-view="members"><span>家庭成员</span><b>成员与共享账目 ›</b></button>
+          ${window.FinanceAuth?.household ? `<button type="button" data-copy-invite><span>家庭邀请码</span><b>${escapeHtml(window.FinanceAuth.household.inviteCode || "--")} · 点击复制</b></button><button type="button" data-cloud-sign-out><span>退出登录</span><b>${escapeHtml(window.FinanceAuth.user?.email || "")} ›</b></button>` : ""}
         </section>
       </div>`;
   }
@@ -435,6 +446,8 @@
     }
     if (event.target.closest("[data-export-csv]")) { exportCsv(); return; }
     if (event.target.closest("[data-import-csv]")) { els.content.querySelector("[data-csv-file]")?.click(); return; }
+    if (event.target.closest("[data-copy-invite]")) { void navigator.clipboard?.writeText(window.FinanceAuth?.household?.inviteCode || ""); showToast("家庭邀请码已复制"); return; }
+    if (event.target.closest("[data-cloud-sign-out]")) { void window.FinanceAuth?.signOut(); return; }
     if (event.target.closest("[data-refresh-investment]")) { refreshDerivedState(); queueSave(); renderInvestments(); showToast("投资账户摘要已刷新"); }
   }
 
@@ -808,10 +821,12 @@
   function monthlySummary(month) {
     const transactions = state.transactions.filter((item) => monthKey(item.occurredAt) === month);
     const included = transactions.filter((item) => item.includeInFamilyStats);
+    const me = state.members.find((item) => item.isCurrentUser)?.id;
+    const privateOthers = (state.memberMonthlySummaries || []).filter((item) => item.month === month && item.memberId !== me);
     return {
       transactions,
-      income: sum(included.filter((item) => ["INCOME", "REFUND", "REIMBURSEMENT"].includes(item.type)).map((item) => item.amountCents)),
-      expense: sum(included.filter((item) => item.type === "EXPENSE").map((item) => item.amountCents))
+      income: sum(included.filter((item) => ["INCOME", "REFUND", "REIMBURSEMENT"].includes(item.type)).map((item) => item.amountCents)) + sum(privateOthers.map((item) => item.incomeCents)),
+      expense: sum(included.filter((item) => item.type === "EXPENSE").map((item) => item.amountCents)) + sum(privateOthers.map((item) => item.expenseCents))
     };
   }
 
@@ -843,8 +858,10 @@
   }
 
   function familyAssetTotals(investments = investmentSummaries()) {
-    const dailyAssets = sum(state.accounts.filter((item) => item.includeInFamilyAssets && !item.isArchived && item.type !== "CREDIT_CARD" && item.type !== "SECURITIES" && !item.externalInvestmentAccountId).map((item) => item.currentBalanceCents));
-    const liabilities = Math.abs(sum(state.accounts.filter((item) => !item.isArchived && item.type === "CREDIT_CARD" && item.currentBalanceCents < 0).map((item) => item.currentBalanceCents)));
+    const me = state.members.find((item) => item.isCurrentUser)?.id;
+    const otherPrivate = (state.memberAssetSummaries || []).filter((item) => item.memberId !== me);
+    const dailyAssets = sum(state.accounts.filter((item) => item.includeInFamilyAssets && !item.isArchived && item.type !== "CREDIT_CARD" && item.type !== "SECURITIES" && !item.externalInvestmentAccountId).map((item) => item.currentBalanceCents)) + sum(otherPrivate.map((item) => item.assetCents));
+    const liabilities = Math.abs(sum(state.accounts.filter((item) => !item.isArchived && item.type === "CREDIT_CARD" && item.currentBalanceCents < 0).map((item) => item.currentBalanceCents))) + sum(otherPrivate.map((item) => item.liabilityCents));
     const investmentAssets = sum(investments.map((item) => item.totalAssetCents));
     return { dailyAssets, liabilities, investmentAssets, totalAssets: dailyAssets + investmentAssets, netAssets: dailyAssets + investmentAssets - liabilities };
   }
@@ -872,7 +889,7 @@
     clearTimeout(saveTimer);
     refreshDerivedState();
     state.updatedAt = new Date().toISOString();
-    localStorage.setItem(CACHE_KEY, JSON.stringify(state));
+    localStorage.setItem(cacheKey(), JSON.stringify(state));
     syncText = "正在保存…";
     void pushRemoteState();
   }
@@ -886,15 +903,56 @@
     if (index >= 0) state.assetSnapshots[index] = snapshot; else state.assetSnapshots.unshift(snapshot);
   }
 
-  async function loadRemoteState() {
+  async function initializeAuthenticatedFinance() {
+    await window.FinanceAuth.ready;
+    state = loadCache() || defaultState();
+    adoptAuthenticatedMembers();
+    bindEvents();
+    navigateRoute(parseRoute());
+    await loadRemoteState();
+    subscribeRealtime();
+  }
+
+  async function loadRemoteState(fromRealtime = false) {
     if (location.protocol === "file:") { syncText = "已保存在此设备 · 本地预览"; return; }
+    if (window.FinanceAuth?.client && window.FinanceAuth.household) {
+      if (cloudBusy) return;
+      cloudBusy = true;
+      try {
+        const client = window.FinanceAuth.client;
+        const householdId = window.FinanceAuth.household.id;
+        const [sharedResult, personalResult] = await Promise.all([
+          client.from("household_finance_state").select("revision,body,updated_at").eq("household_id", householdId).maybeSingle(),
+          client.from("personal_finance_state").select("revision,body,updated_at").eq("household_id", householdId).eq("user_id", window.FinanceAuth.user.id).maybeSingle()
+        ]);
+        if (sharedResult.error) throw sharedResult.error;
+        if (personalResult.error) throw personalResult.error;
+        sharedRevision = Number(sharedResult.data?.revision || 0);
+        personalRevision = Number(personalResult.data?.revision || 0);
+        if (sharedResult.data?.body && hasFinanceData(sharedResult.data.body)) {
+          state = mergeCloudState(sharedResult.data.body, personalResult.data?.body || privateStateBody(state));
+          adoptAuthenticatedMembers();
+          syncText = fromRealtime ? "已收到家庭成员的更新" : "已从家庭云端读取";
+          localStorage.setItem(cacheKey(), JSON.stringify(state));
+        } else {
+          adoptAuthenticatedMembers();
+          await pushRemoteState();
+        }
+      } catch (_) {
+        syncText = "已保存在此设备 · 云端读取失败";
+      } finally {
+        cloudBusy = false;
+      }
+      if (document.body.classList.contains("finance-mode")) render();
+      return;
+    }
     try {
       const response = await fetch(API_URL, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json();
       if (payload.state && hasFinanceData(payload.state)) state = normalizeState(payload.state);
       else await pushRemoteState();
-      localStorage.setItem(CACHE_KEY, JSON.stringify(state));
+      localStorage.setItem(cacheKey(), JSON.stringify(state));
       syncText = "已从云端读取保存数据";
       if (document.body.classList.contains("finance-mode")) render();
     } catch (_) {
@@ -906,6 +964,30 @@
   async function pushRemoteState() {
     if (location.protocol === "file:") { syncText = "已保存在此设备 · 本地预览"; return; }
     refreshDerivedState();
+    if (window.FinanceAuth?.client && window.FinanceAuth.household) {
+      const client = window.FinanceAuth.client;
+      const householdId = window.FinanceAuth.household.id;
+      const bodies = splitCloudState();
+      cloudBusy = true;
+      try {
+        const sharedResult = await client.rpc("save_household_finance_state", { target_household_id: householdId, expected_revision: sharedRevision, next_body: bodies.shared });
+        if (sharedResult.error) throw sharedResult.error;
+        sharedRevision = Number((Array.isArray(sharedResult.data) ? sharedResult.data[0] : sharedResult.data)?.revision || sharedRevision + 1);
+        const personalResult = await client.rpc("save_personal_finance_state", { target_household_id: householdId, expected_revision: personalRevision, next_body: bodies.personal });
+        if (personalResult.error) throw personalResult.error;
+        personalRevision = Number((Array.isArray(personalResult.data) ? personalResult.data[0] : personalResult.data)?.revision || personalRevision + 1);
+        syncText = "已保存到家庭云端";
+      } catch (error) {
+        if (/revision conflict/i.test(error.message || "")) {
+          syncText = "检测到他人更新，正在重新读取…";
+          cloudBusy = false;
+          await loadRemoteState(true);
+          toast("另一台设备刚刚保存了数据，请确认后重试本次修改。");
+        } else syncText = "已保存在此设备 · 云端保存失败";
+      } finally { cloudBusy = false; }
+      if (document.body.classList.contains("finance-mode")) render();
+      return;
+    }
     try {
       const response = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ state }) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -914,8 +996,13 @@
     if (document.body.classList.contains("finance-mode")) render();
   }
 
+  function cacheKey() {
+    const auth = window.FinanceAuth;
+    return auth?.user?.id && auth?.household?.id ? `${CACHE_KEY}:${auth.user.id}:${auth.household.id}` : CACHE_KEY;
+  }
+
   function loadCache() {
-    try { const value = JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); return value ? normalizeState(value) : null; } catch (_) { return null; }
+    try { const value = JSON.parse(localStorage.getItem(cacheKey()) || "null"); return value ? normalizeState(value) : null; } catch (_) { return null; }
   }
 
   function normalizeState(raw) {
@@ -933,8 +1020,80 @@
       goals,
       goalEntries: Array.isArray(raw.goalEntries) ? raw.goalEntries : [],
       assetSnapshots: Array.isArray(raw.assetSnapshots) ? raw.assetSnapshots : [],
-      investmentSummaries: Array.isArray(raw.investmentSummaries) ? raw.investmentSummaries : []
+      investmentSummaries: Array.isArray(raw.investmentSummaries) ? raw.investmentSummaries : [],
+      memberAssetSummaries: Array.isArray(raw.memberAssetSummaries) ? raw.memberAssetSummaries : [],
+      memberMonthlySummaries: Array.isArray(raw.memberMonthlySummaries) ? raw.memberMonthlySummaries : []
     };
+  }
+
+  function adoptAuthenticatedMembers() {
+    const auth = window.FinanceAuth;
+    if (!auth?.user) return;
+    const oldCurrent = state.members.find((item) => item.isCurrentUser)?.id || "member-me";
+    const newCurrent = auth.user.id;
+    if (oldCurrent !== newCurrent) {
+      state.accounts.forEach((item) => { if (item.ownerMemberId === oldCurrent) item.ownerMemberId = newCurrent; });
+      state.transactions.forEach((item) => {
+        ["ownerMemberId", "payerMemberId", "bookkeeperMemberId"].forEach((key) => { if (item[key] === oldCurrent) item[key] = newCurrent; });
+      });
+      state.dreamAnimals.forEach((item) => { if (item.ownerMemberId === oldCurrent) item.ownerMemberId = newCurrent; });
+    }
+    const roles = { owner: "家庭创建者", admin: "家庭管理员", member: "家庭成员" };
+    state.members = (auth.members?.length ? auth.members : [auth.member]).map((item) => ({ id: item.id, displayName: item.displayName || "家庭成员", role: roles[item.role] || "家庭成员", isCurrentUser: item.id === newCurrent, isActive: true }));
+  }
+
+  function privateStateBody(source = state) {
+    return {
+      version: 1,
+      updatedAt: source.updatedAt,
+      accounts: source.accounts.filter((item) => !item.isShared),
+      transactions: source.transactions.filter((item) => !item.isShared)
+    };
+  }
+
+  function splitCloudState() {
+    const personal = privateStateBody(state);
+    const currentId = state.members.find((item) => item.isCurrentUser)?.id;
+    const privateAccounts = personal.accounts.filter((item) => item.ownerMemberId === currentId && !item.isArchived);
+    const privateSummary = {
+      memberId: currentId,
+      assetCents: sum(privateAccounts.filter((item) => item.includeInFamilyAssets && item.type !== "CREDIT_CARD" && item.type !== "SECURITIES" && !item.externalInvestmentAccountId).map((item) => item.currentBalanceCents)),
+      liabilityCents: Math.abs(sum(privateAccounts.filter((item) => item.type === "CREDIT_CARD" && item.currentBalanceCents < 0).map((item) => item.currentBalanceCents))),
+      updatedAt: new Date().toISOString()
+    };
+    const memberAssetSummaries = [...(state.memberAssetSummaries || []).filter((item) => item.memberId !== currentId), privateSummary];
+    const privateMonths = [...new Set(personal.transactions.filter((item) => item.includeInFamilyStats).map((item) => monthKey(item.occurredAt)))];
+    const currentMonthly = privateMonths.map((month) => {
+      const rows = personal.transactions.filter((item) => item.includeInFamilyStats && monthKey(item.occurredAt) === month);
+      return { memberId: currentId, month, incomeCents: sum(rows.filter((item) => ["INCOME", "REFUND", "REIMBURSEMENT"].includes(item.type)).map((item) => item.amountCents)), expenseCents: sum(rows.filter((item) => item.type === "EXPENSE").map((item) => item.amountCents)), updatedAt: new Date().toISOString() };
+    });
+    const memberMonthlySummaries = [...(state.memberMonthlySummaries || []).filter((item) => item.memberId !== currentId), ...currentMonthly];
+    const shared = {
+      ...state,
+      accounts: state.accounts.filter((item) => item.isShared),
+      transactions: state.transactions.filter((item) => item.isShared),
+      memberAssetSummaries,
+      memberMonthlySummaries
+    };
+    return { shared, personal };
+  }
+
+  function mergeCloudState(sharedBody, personalBody) {
+    const shared = normalizeState(sharedBody);
+    const personalAccounts = Array.isArray(personalBody?.accounts) ? personalBody.accounts : [];
+    const personalTransactions = Array.isArray(personalBody?.transactions) ? personalBody.transactions : [];
+    return normalizeState({ ...shared, accounts: [...shared.accounts, ...personalAccounts], transactions: [...shared.transactions, ...personalTransactions] });
+  }
+
+  function subscribeRealtime() {
+    const auth = window.FinanceAuth;
+    if (!auth?.client || realtimeChannel) return;
+    let timer = 0;
+    const reload = () => { clearTimeout(timer); timer = window.setTimeout(() => { if (!cloudBusy) void loadRemoteState(true); }, 450); };
+    realtimeChannel = auth.client.channel(`finance-${auth.household.id}-${auth.user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "household_finance_state", filter: `household_id=eq.${auth.household.id}` }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "personal_finance_state", filter: `user_id=eq.${auth.user.id}` }, reload)
+      .subscribe();
   }
 
   function hasFinanceData(value) { return value && Array.isArray(value.accounts) && value.accounts.length > 0 && Array.isArray(value.transactions); }

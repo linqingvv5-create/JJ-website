@@ -23,6 +23,9 @@ $assets = @(
   'data.js',
   'trade-board.js',
   'finance-system.js',
+  'supabase-config.js',
+  'supabase-auth.js',
+  'supabase-auth.css',
   'sync-auth.js',
   'manifest.webmanifest',
   'finance-manifest.webmanifest',
@@ -31,6 +34,8 @@ $assets = @(
 foreach ($asset in $assets) {
   Copy-Item -LiteralPath (Join-Path $root $asset) -Destination (Join-Path $client $asset) -Force
 }
+New-Item -ItemType Directory -Path (Join-Path $client 'vendor') -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $root 'vendor\supabase.min.js') -Destination (Join-Path $client 'vendor\supabase.min.js') -Force
 Copy-Item -LiteralPath (Join-Path $root 'finance.html') -Destination (Join-Path $client 'index.html') -Force
 Copy-Item -LiteralPath (Join-Path $root 'worker\site-worker.js') -Destination (Join-Path $server 'index.js') -Force
 
