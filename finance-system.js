@@ -22,7 +22,7 @@
     ["income-book", "写书收入", "INCOME", null], ["income-up", "UP主收入", "INCOME", null],
     ["income-dividend", "投资分红", "INCOME", null], ["income-interest", "利息", "INCOME", null],
     ["income-refund", "退款", "INCOME", null], ["income-other", "其他收入", "INCOME", null],
-    ["expense-required", "生活必须支出", "EXPENSE", null], ["expense-food", "饮食", "EXPENSE", "expense-required"],
+    ["expense-required", "生活必须支出", "EXPENSE", null], ["expense-food", "餐饮", "EXPENSE", "expense-required"],
     ["expense-home", "居住", "EXPENSE", "expense-required"], ["expense-utilities", "水电燃气", "EXPENSE", "expense-required"],
     ["expense-phone", "通讯", "EXPENSE", "expense-required"], ["expense-commute", "通勤", "EXPENSE", "expense-required"],
     ["expense-medical", "医疗", "EXPENSE", "expense-required"], ["expense-insurance", "基础保险", "EXPENSE", "expense-required"],
@@ -54,7 +54,7 @@
   let ledgerType = "ALL";
   let ledgerSortKey = "occurredAt";
   let ledgerSortDirection = "desc";
-  let syncText = "正在连接共享数据…";
+  let syncText = "正在读取云端保存…";
   let saveTimer = 0;
   let toastTimer = 0;
 
@@ -170,20 +170,18 @@
   function renderOverview() {
     const monthly = monthlySummary(ledgerMonth);
     const investments = investmentSummaries();
-    const dailyAssets = sum(state.accounts.filter((item) => item.includeInFamilyAssets && item.type !== "CREDIT_CARD" && item.type !== "SECURITIES").map((item) => item.currentBalanceCents));
-    const liabilities = Math.abs(sum(state.accounts.filter((item) => item.type === "CREDIT_CARD" && item.currentBalanceCents < 0).map((item) => item.currentBalanceCents)));
-    const investmentAssets = sum(investments.map((item) => item.totalAssetCents));
-    const netAssets = dailyAssets + investmentAssets - liabilities;
+    const assets = familyAssetTotals(investments);
+    const investmentAssets = assets.investmentAssets;
     const recent = filteredTransactions().slice(0, 5);
     const goals = effectiveGoals(investments).slice(0, 3);
     els.content.innerHTML = `
       <div class="finance-page">
         ${pageHead("资金总览", "日常资金与投资资产分开记录、统一查看", `<button class="finance-primary" data-add-transaction>＋ 快速记账</button>`)}
         <section class="finance-summary-grid">
-          ${summaryCard("家庭净资产", money(netAssets), "")}
-          ${summaryCard("本月收入", money(monthly.income), "finance-positive")}
-          ${summaryCard("本月支出", money(monthly.expense), "finance-negative")}
-          ${summaryCard("本月结余", signedMoney(monthly.income - monthly.expense), monthly.income - monthly.expense >= 0 ? "finance-positive" : "finance-negative")}
+          ${summaryCard("家庭净资产", money(assets.netAssets), "")}
+          ${summaryCard("本月收入", money(monthly.income), "finance-income")}
+          ${summaryCard("本月支出", money(monthly.expense), "finance-expense")}
+          ${summaryCard("本月结余", signedMoney(monthly.income - monthly.expense), monthly.income - monthly.expense >= 0 ? "finance-income" : "finance-expense")}
         </section>
         <div class="finance-section-grid">
           <section class="finance-panel">
@@ -222,11 +220,12 @@
         </div>
         <div class="finance-table-wrap">
           <table class="finance-table">
-            <thead><tr><th><button data-ledger-sort="occurredAt">日期时间 ${sortMark("occurredAt")}</button></th><th><button data-ledger-sort="amountCents">金额 ${sortMark("amountCents")}</button></th><th><button data-ledger-sort="type">类型 ${sortMark("type")}</button></th><th>一级分类</th><th>二级分类</th><th>支出账户</th><th>收入账户</th><th>记账人</th><th>实际付款人</th><th>个人或家庭</th><th>鹅鸭鸡目标</th><th>商家</th><th>备注</th></tr></thead>
+            <thead><tr><th><button data-ledger-sort="occurredAt">日期时间 ${sortMark("occurredAt")}</button></th><th><button data-ledger-sort="amountCents">金额 ${sortMark("amountCents")}</button></th><th><button data-ledger-sort="type">类型 ${sortMark("type")}</button></th><th>一级分类</th><th>二级分类</th><th>支出账户</th><th>收入账户</th><th>记账人</th><th>实际付款人</th><th>个人或家庭</th><th>是否共享</th><th>鹅鸭鸡目标</th><th>商家</th><th>备注</th></tr></thead>
             <tbody>${rows.map(transactionTableRow).join("")}</tbody>
           </table>
           ${rows.length ? "" : empty("当前筛选条件下没有账目。")}
         </div>
+        <div class="finance-mobile-ledger">${rows.length ? rows.map(transactionCard).join("") : empty("当前筛选条件下没有账目。")}</div>
       </div>`;
   }
 
@@ -251,7 +250,7 @@
     const goals = effectiveGoals(investments);
     els.content.innerHTML = `
       <div class="finance-page">
-        ${pageHead("鹅鸭鸡", "鹅管长期积累，鸭管中期目标，鸡管短期愿望", `<button class="finance-primary" data-add-goal>＋ 新建目标</button>`)}
+        ${pageHead("鹅鸭鸡", "鹅：长期财富与投资；鸭：中长期目标；鸡：短期愿望和计划", `<button class="finance-primary" data-add-goal>＋ 新建目标</button>`)}
         <div class="finance-goal-grid">${goals.map(goalCard).join("")}</div>
       </div>`;
   }
@@ -269,7 +268,7 @@
         ${pageHead("投资账户", "从原投资系统实时汇总，不生成家庭收入或支出", `<button class="finance-secondary" data-refresh-investment>刷新摘要</button>`)}
         <section class="finance-summary-grid">
           ${summaryCard("投资总资产", money(totals.asset), "")}${summaryCard("累计投入本金", money(totals.principal), "")}
-          ${summaryCard("当前盈亏", signedMoney(totals.pnl), totals.pnl >= 0 ? "finance-positive" : "finance-negative")}${summaryCard("可用资金", money(totals.cash), "")}
+          ${summaryCard("当前盈亏", signedMoney(totals.pnl), totals.pnl >= 0 ? "finance-stock-up" : "finance-stock-down")}${summaryCard("可用资金", money(totals.cash), "")}
         </section>
         <section class="finance-panel" style="margin:14px 16px 18px">
           <div class="finance-panel-head"><strong>账户资产摘要</strong><span>${rows.length} 个投资账户</span></div>
@@ -288,7 +287,7 @@
       <div class="finance-page">
         ${pageHead("报表", "月报、年度趋势和家庭资产摘要", `<input type="month" class="finance-secondary" data-report-month value="${escapeAttribute(ledgerMonth)}">`)}
         <section class="finance-summary-grid">
-          ${summaryCard("本月收入", money(current.income), "finance-positive")}${summaryCard("本月支出", money(current.expense), "finance-negative")}
+          ${summaryCard("本月收入", money(current.income), "finance-income")}${summaryCard("本月支出", money(current.expense), "finance-expense")}
           ${summaryCard("必须支出", money(required), "")}${summaryCard("非必须支出", money(optional), "")}
         </section>
         <div class="finance-section-grid">
@@ -579,7 +578,7 @@
     const existing = goalById(goalId);
     const modal = createModal(existing ? "编辑鹅鸭鸡目标" : "新建鹅鸭鸡目标", `<form class="finance-form">
       <label class="is-wide"><span>目标名称</span><input name="name" value="${escapeAttribute(existing?.name || "")}" required placeholder="例如：装修鸭"></label>
-      <label><span>类型</span><select name="kind">${optionList([["GOOSE","鹅 · 长期积累"],["DUCK","鸭 · 中期目标"],["CHICKEN","鸡 · 短期愿望"]], existing?.kind || "DUCK")}</select></label>
+      <label><span>类型</span><select name="kind">${optionList([["GOOSE","鹅 · 长期财富与投资"],["DUCK","鸭 · 中长期目标"],["CHICKEN","鸡 · 短期愿望和计划"]], existing?.kind || "DUCK")}</select></label>
       <label><span>目标金额（元）</span><input name="target" type="number" min="1" step="0.01" value="${existing ? (existing.targetAmountCents / 100).toFixed(2) : ""}" required></label>
       <label><span>预计完成日期</span><input name="targetDate" type="date" value="${escapeAttribute(existing?.targetDate || "")}"></label>
       <label><span>状态</span><select name="status">${optionList([["ACTIVE","进行中"],["SAVING","存钱中"],["GROWN","已长成"],["USED","已使用"],["COMPLETED","已完成"],["CLOSED","已关闭"]], existing?.status || "ACTIVE")}</select></label>
@@ -608,7 +607,7 @@
   function openGoalHistory(goalId) {
     const goal = goalById(goalId); if (!goal) return;
     const entries = state.goalEntries.filter((item) => item.goalId === goalId).sort((a, b) => String(b.occurredAt).localeCompare(String(a.occurredAt)));
-    createModal(`${goal.name} · 资金变化历史`, entries.length ? `<div class="finance-history-list">${entries.map((item) => `<div><span>${escapeHtml(formatDateTime(item.occurredAt))} · ${item.type === "SPEND" ? "目标支出" : "转入目标"}</span><strong class="${item.amountCents >= 0 ? "finance-positive" : "finance-negative"}">${signedMoney(item.amountCents)}</strong><small>${escapeHtml(state.transactions.find((transaction) => transaction.id === item.transactionId)?.note || "--")}</small></div>`).join("")}</div>` : empty("还没有目标资金变化。"));
+    createModal(`${goal.name} · 资金变化历史`, entries.length ? `<div class="finance-history-list">${entries.map((item) => `<div><span>${escapeHtml(formatDateTime(item.occurredAt))} · ${item.type === "SPEND" ? "目标支出" : "转入目标"}</span><strong class="${item.amountCents >= 0 ? "finance-transfer" : "finance-expense"}">${signedMoney(item.amountCents)}</strong><small>${escapeHtml(state.transactions.find((transaction) => transaction.id === item.transactionId)?.note || "--")}</small></div>`).join("")}</div>` : empty("还没有目标资金变化。"));
   }
 
   function createModal(title, body) {
@@ -648,12 +647,11 @@
 
   function transactionRow(item) {
     const account = item.type === "EXPENSE" ? accountName(item.fromAccountId) : accountName(item.toAccountId || item.fromAccountId);
-    return `<div class="finance-account-row"><div><span>${shortDate(item.occurredAt)} · ${escapeHtml(typeName(item.type))}</span><strong>${escapeHtml(categoryName(item.categoryId) || item.note || "未分类")}</strong></div><div><span>${escapeHtml(account)}</span><strong class="${item.type === "EXPENSE" ? "finance-negative" : item.type === "TRANSFER" ? "" : "finance-positive"}">${transactionMoney(item)}</strong></div><div><span>归属</span><strong>${item.ownership === "FAMILY" ? "家庭" : memberName(item.ownerMemberId)}</strong></div><div><span>备注</span><strong>${escapeHtml(item.note || "--")}</strong></div></div>`;
+    return `<div class="finance-account-row"><div><span>${shortDate(item.occurredAt)} · ${escapeHtml(typeName(item.type))}</span><strong>${escapeHtml(categoryName(item.categoryId) || item.note || "未分类")}</strong></div><div><span>${escapeHtml(account)}</span><strong class="${transactionColorClass(item.type)}">${transactionMoney(item)}</strong></div><div><span>归属</span><strong>${item.ownership === "FAMILY" ? "家庭" : memberName(item.ownerMemberId)}</strong></div><div><span>备注</span><strong>${escapeHtml(item.note || "--")}</strong></div></div>`;
   }
 
   function compactGoalRow(goal) {
-    const ratio = progress(goal);
-    return `<div class="finance-account-row"><div><span>${animalName(goal.kind)}</span><strong>${escapeHtml(goal.name)}</strong></div><div><span>当前 / 目标</span><strong>${money(goal.currentAmountCents)} / ${money(goal.targetAmountCents)}</strong></div><div><span>完成比例</span><strong>${ratio.toFixed(1)}%</strong></div><div><span>状态</span><strong>${escapeHtml(goalStatusName(goal.status))}</strong></div></div>`;
+    return `<div class="finance-account-row"><div><span>${animalName(goal.kind)}</span><strong>${escapeHtml(goal.name)}</strong></div><div><span>当前 / 目标</span><strong>${money(goal.currentAmountCents)} / ${money(goal.targetAmountCents)}</strong></div><div><span>完成比例</span><strong>${formatProgress(goal)}</strong></div><div><span>状态</span><strong>${escapeHtml(goalStatusName(effectiveGoalStatus(goal)))}</strong></div></div>`;
   }
 
   function goalCard(goal) {
@@ -666,20 +664,30 @@
     return `<article class="finance-goal-card">
       <div class="finance-goal-top"><div class="finance-animal"><div class="finance-animal-figure" style="--animal-size:${size}px">${emoji}</div><div><h3>${escapeHtml(goal.name)}</h3><p>${escapeHtml(goal.note || animalName(goal.kind))}</p></div></div><div class="finance-goal-value"><strong>${money(goal.currentAmountCents)}</strong><span>目标 ${money(goal.targetAmountCents)}</span></div></div>
       <div class="finance-progress"><i style="width:${Math.min(100, ratio)}%"></i></div>
-      <div class="finance-goal-meta"><div><span>完成比例</span><strong>${ratio.toFixed(1)}%</strong></div><div><span>累计本金</span><strong>${money(goal.principalCents)}</strong></div><div><span>累计收益</span><strong>${signedMoney(goal.earningsCents)}</strong></div><div><span>本月新增</span><strong>${money(monthAdded)}</strong></div><div><span>已支出</span><strong>${money(goal.spentAmountCents)}</strong></div><div><span>剩余目标</span><strong>${money(remaining)}</strong></div><div><span>预计完成</span><strong>${escapeHtml(goal.targetDate || "未设置")}</strong></div><div><span>关联账户</span><strong>${escapeHtml(linkedNames)}</strong></div><div><span>状态</span><strong>${escapeHtml(goalStatusName(goal.status))}</strong></div></div>
+      <div class="finance-goal-meta"><div><span>完成比例</span><strong>${formatProgress(goal)}</strong></div><div><span>累计本金</span><strong>${money(goal.principalCents)}</strong></div><div><span>累计收益</span><strong class="${goal.earningsCents >= 0 ? "finance-stock-up" : "finance-stock-down"}">${signedMoney(goal.earningsCents)}</strong></div><div><span>本月新增</span><strong>${money(monthAdded)}</strong></div><div><span>已支出</span><strong>${money(goal.spentAmountCents)}</strong></div><div><span>剩余目标</span><strong>${money(remaining)}</strong></div><div><span>预计完成</span><strong>${escapeHtml(goal.targetDate || "未设置")}</strong></div><div><span>关联账户</span><strong>${escapeHtml(linkedNames)}</strong></div><div><span>状态</span><strong>${escapeHtml(goalStatusName(effectiveGoalStatus(goal)))}</strong></div></div>
       <div class="finance-inline-actions"><button class="finance-primary" data-allocate-goal="${escapeAttribute(goal.id)}">转入目标</button>${goal.kind === "CHICKEN" ? `<button class="finance-secondary" data-spend-goal="${escapeAttribute(goal.id)}">目标支出</button>` : ""}<button class="finance-secondary" data-goal-history="${escapeAttribute(goal.id)}">历史</button><button class="finance-secondary" data-edit-goal="${escapeAttribute(goal.id)}">编辑</button></div>
     </article>`;
   }
 
   function investmentRow(item) {
-    return `<div class="finance-investment-row"><div><span>证券账户</span><strong>${escapeHtml(item.name)}</strong></div><div><span>当前总资产</span><strong>${money(item.totalAssetCents)}</strong></div><div><span>累计本金 / 盈亏</span><strong>${money(item.principalCents)} / <b class="${item.profitLossCents >= 0 ? "finance-positive" : "finance-negative"}">${signedMoney(item.profitLossCents)}</b></strong></div><div><span>可用资金 · 更新时间</span><strong>${money(item.availableCashCents)} · ${shortDate(item.updatedAt)}</strong></div></div>`;
+    return `<div class="finance-investment-row"><div><span>证券账户</span><strong>${escapeHtml(item.name)}</strong></div><div><span>总资产（含可用资金）</span><strong>${money(item.totalAssetCents)}</strong></div><div><span>推算本金 / 投资盈亏</span><strong>${money(item.principalCents)} / <b class="${item.profitLossCents >= 0 ? "finance-stock-up" : "finance-stock-down"}">${signedMoney(item.profitLossCents)}</b></strong></div><div><span>账户内可用资金 · 更新时间</span><strong>${money(item.availableCashCents)} · ${shortDate(item.updatedAt)}</strong></div></div>`;
   }
 
   function transactionTableRow(item) {
     const category = categoryById(item.categoryId);
     const parent = category?.parentId ? categoryById(category.parentId) : category;
     const sub = category?.parentId ? category : null;
-    return `<tr data-transaction-id="${escapeAttribute(item.id)}"><td>${escapeHtml(formatDateTime(item.occurredAt))}</td><td class="${item.type === "EXPENSE" ? "finance-negative" : item.type === "TRANSFER" ? "" : "finance-positive"}"><strong>${transactionMoney(item)}</strong></td><td>${escapeHtml(typeName(item.type))}</td><td>${escapeHtml(parent?.name || "--")}</td><td>${escapeHtml(sub?.name || "--")}</td><td>${escapeHtml(accountName(item.fromAccountId))}</td><td>${escapeHtml(accountName(item.toAccountId))}</td><td>${escapeHtml(memberName(item.bookkeeperMemberId))}</td><td>${escapeHtml(memberName(item.payerMemberId))}</td><td>${item.ownership === "FAMILY" ? "家庭" : "个人"}</td><td>${escapeHtml(goalById(item.goalId)?.name || "--")}</td><td>${escapeHtml(item.merchant || "--")}</td><td contenteditable="true" data-edit-note="${escapeAttribute(item.id)}">${escapeHtml(item.note || "")}</td></tr>`;
+    return `<tr data-transaction-id="${escapeAttribute(item.id)}"><td>${escapeHtml(formatDateTime(item.occurredAt))}</td><td class="${transactionColorClass(item.type)}"><strong>${transactionMoney(item)}</strong></td><td>${escapeHtml(typeName(item.type))}</td><td>${escapeHtml(parent?.name || "--")}</td><td>${escapeHtml(sub?.name || "--")}</td><td>${escapeHtml(accountName(item.fromAccountId))}</td><td>${escapeHtml(accountName(item.toAccountId))}</td><td>${escapeHtml(memberName(item.bookkeeperMemberId))}</td><td>${escapeHtml(memberName(item.payerMemberId))}</td><td>${item.ownership === "FAMILY" ? "家庭" : "个人"}</td><td>${item.isShared ? "共享" : "私密"}</td><td>${escapeHtml(goalById(item.goalId)?.name || "--")}</td><td>${escapeHtml(item.merchant || "--")}</td><td contenteditable="true" data-edit-note="${escapeAttribute(item.id)}">${escapeHtml(item.note || "")}</td></tr>`;
+  }
+
+  function transactionCard(item) {
+    const category = categoryById(item.categoryId);
+    const parent = category?.parentId ? categoryById(category.parentId) : category;
+    const sub = category?.parentId ? category : null;
+    return `<article class="finance-ledger-card" data-transaction-id="${escapeAttribute(item.id)}">
+      <div class="finance-ledger-card-head"><div><span>${escapeHtml(formatDateTime(item.occurredAt))}</span><strong>${escapeHtml(typeName(item.type))}</strong></div><b class="${transactionColorClass(item.type)}">${transactionMoney(item)}</b></div>
+      <dl><div><dt>分类</dt><dd>${escapeHtml([parent?.name, sub?.name].filter(Boolean).join(" / ") || "--")}</dd></div><div><dt>资金流</dt><dd>${escapeHtml(accountName(item.fromAccountId))} → ${escapeHtml(accountName(item.toAccountId))}</dd></div><div><dt>记账 / 付款</dt><dd>${escapeHtml(memberName(item.bookkeeperMemberId))} / ${escapeHtml(memberName(item.payerMemberId))}</dd></div><div><dt>归属 / 共享</dt><dd>${item.ownership === "FAMILY" ? "家庭" : "个人"} / ${item.isShared ? "共享" : "私密"}</dd></div><div><dt>目标 / 商家</dt><dd>${escapeHtml(goalById(item.goalId)?.name || "--")} / ${escapeHtml(item.merchant || "--")}</dd></div><div><dt>备注</dt><dd>${escapeHtml(item.note || "--")}</dd></div></dl>
+    </article>`;
   }
 
   function reportBars(item, max) {
@@ -743,6 +751,13 @@
     });
   }
 
+  function familyAssetTotals(investments = investmentSummaries()) {
+    const dailyAssets = sum(state.accounts.filter((item) => item.includeInFamilyAssets && !item.isArchived && item.type !== "CREDIT_CARD" && item.type !== "SECURITIES" && !item.externalInvestmentAccountId).map((item) => item.currentBalanceCents));
+    const liabilities = Math.abs(sum(state.accounts.filter((item) => !item.isArchived && item.type === "CREDIT_CARD" && item.currentBalanceCents < 0).map((item) => item.currentBalanceCents)));
+    const investmentAssets = sum(investments.map((item) => item.totalAssetCents));
+    return { dailyAssets, liabilities, investmentAssets, totalAssets: dailyAssets + investmentAssets, netAssets: dailyAssets + investmentAssets - liabilities };
+  }
+
   function effectiveGoals(investments) {
     const investmentAsset = sum(investments.map((item) => item.totalAssetCents));
     const investmentPnl = sum(investments.map((item) => item.profitLossCents));
@@ -773,17 +788,15 @@
 
   function refreshDerivedState() {
     state.investmentSummaries = investmentSummaries();
-    const accountAssets = sum(state.accounts.filter((item) => item.includeInFamilyAssets && !item.isArchived && item.type !== "CREDIT_CARD" && item.type !== "SECURITIES").map((item) => item.currentBalanceCents));
-    const liabilities = Math.abs(sum(state.accounts.filter((item) => item.type === "CREDIT_CARD" && item.currentBalanceCents < 0).map((item) => item.currentBalanceCents)));
-    const investmentAssets = sum(state.investmentSummaries.map((item) => item.totalAssetCents));
+    const assets = familyAssetTotals(state.investmentSummaries);
     const today = new Date().toISOString().slice(0, 10);
-    const snapshot = { id: `family-${today}`, snapshotDate: today, scope: "FAMILY", scopeId: "family", assetCents: accountAssets + investmentAssets, liabilityCents: liabilities, netAssetCents: accountAssets + investmentAssets - liabilities, principalCents: sum(state.investmentSummaries.map((item) => item.principalCents)), profitLossCents: sum(state.investmentSummaries.map((item) => item.profitLossCents)), source: "ACCOUNT_AND_INVESTMENT_SUMMARY", createdAt: new Date().toISOString() };
+    const snapshot = { id: `family-${today}`, snapshotDate: today, scope: "FAMILY", scopeId: "family", assetCents: assets.totalAssets, liabilityCents: assets.liabilities, netAssetCents: assets.netAssets, principalCents: sum(state.investmentSummaries.map((item) => item.principalCents)), profitLossCents: sum(state.investmentSummaries.map((item) => item.profitLossCents)), source: "ACCOUNT_AND_INVESTMENT_SUMMARY", createdAt: new Date().toISOString() };
     const index = state.assetSnapshots.findIndex((item) => item.id === snapshot.id);
     if (index >= 0) state.assetSnapshots[index] = snapshot; else state.assetSnapshots.unshift(snapshot);
   }
 
   async function loadRemoteState() {
-    if (location.protocol === "file:") { syncText = "本地预览 · 等待云端发布"; return; }
+    if (location.protocol === "file:") { syncText = "已保存在此设备 · 本地预览"; return; }
     try {
       const response = await fetch(API_URL, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -791,22 +804,22 @@
       if (payload.state && hasFinanceData(payload.state)) state = normalizeState(payload.state);
       else await pushRemoteState();
       localStorage.setItem(CACHE_KEY, JSON.stringify(state));
-      syncText = "共享数据已同步";
+      syncText = "已从云端读取保存数据";
       if (document.body.classList.contains("finance-mode")) render();
     } catch (_) {
-      syncText = "离线缓存 · 恢复连接后同步";
+      syncText = "已保存在此设备 · 云端暂不可用";
       if (document.body.classList.contains("finance-mode")) render();
     }
   }
 
   async function pushRemoteState() {
-    if (location.protocol === "file:") { syncText = "本地预览 · 尚未上传"; return; }
+    if (location.protocol === "file:") { syncText = "已保存在此设备 · 本地预览"; return; }
     refreshDerivedState();
     try {
       const response = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ state }) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      syncText = "共享数据已保存";
-    } catch (_) { syncText = "已保存在设备，等待云端同步"; }
+      syncText = "已保存到云端共享账本";
+    } catch (_) { syncText = "已保存在此设备 · 云端保存失败"; }
     if (document.body.classList.contains("finance-mode")) render();
   }
 
@@ -822,7 +835,7 @@
       version: 1,
       updatedAt: String(raw.updatedAt || new Date().toISOString()),
       members: Array.isArray(raw.members) && raw.members.length ? raw.members : fallback.members,
-      categories: Array.isArray(raw.categories) && raw.categories.length ? raw.categories : fallback.categories,
+      categories: (Array.isArray(raw.categories) && raw.categories.length ? raw.categories : fallback.categories).map((category) => category.id === "expense-food" ? { ...category, name: "餐饮" } : category),
       accounts: Array.isArray(raw.accounts) && raw.accounts.length ? raw.accounts : fallback.accounts,
       transactions: Array.isArray(raw.transactions) ? raw.transactions : [],
       dreamAnimals,
@@ -836,10 +849,10 @@
   function hasFinanceData(value) { return value && Array.isArray(value.accounts) && value.accounts.length > 0 && Array.isArray(value.transactions); }
 
   function exportCsv() {
-    const headers = ["日期时间","金额","类型","一级分类","二级分类","支出账户","收入账户","记账人","实际付款人","个人或家庭","鹅鸭鸡目标","商家","备注"];
+    const headers = ["日期时间","金额","类型","一级分类","二级分类","支出账户","收入账户","记账人","实际付款人","个人或家庭","是否共享","鹅鸭鸡目标","商家","备注"];
     const rows = filteredTransactions().map((item) => {
       const category = categoryById(item.categoryId); const parent = category?.parentId ? categoryById(category.parentId) : category;
-      return [formatDateTime(item.occurredAt), (item.amountCents / 100).toFixed(2), typeName(item.type), parent?.name || "", category?.parentId ? category.name : "", accountName(item.fromAccountId), accountName(item.toAccountId), memberName(item.bookkeeperMemberId), memberName(item.payerMemberId), item.ownership === "FAMILY" ? "家庭" : "个人", goalById(item.goalId)?.name || "", item.merchant || "", item.note || ""];
+      return [formatDateTime(item.occurredAt), (item.amountCents / 100).toFixed(2), typeName(item.type), parent?.name || "", category?.parentId ? category.name : "", accountName(item.fromAccountId), accountName(item.toAccountId), memberName(item.bookkeeperMemberId), memberName(item.payerMemberId), item.ownership === "FAMILY" ? "家庭" : "个人", item.isShared ? "是" : "否", goalById(item.goalId)?.name || "", item.merchant || "", item.note || ""];
     });
     const csv = "\ufeff" + [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
     downloadBlob(csv, `家庭账本-${ledgerMonth}.csv`, "text/csv;charset=utf-8");
@@ -862,7 +875,7 @@
         const bookkeeper = state.members.find((item) => item.displayName === data["记账人"]) || state.members[0];
         const goal = state.goals.find((item) => item.name === data["鹅鸭鸡目标"]);
         if (!Number.isFinite(amountCents) || amountCents <= 0) throw new Error("bad amount");
-        const transaction = { id: uid("import"), occurredAt: new Date(data["日期时间"] || Date.now()).toISOString(), type, amountCents, categoryId: category?.id || "", fromAccountId: from?.id || "", toAccountId: to?.id || "", bookkeeperMemberId: bookkeeper?.id || "", payerMemberId: payer?.id || "", ownership: data["个人或家庭"] === "个人" ? "PERSONAL" : "FAMILY", ownerMemberId: data["个人或家庭"] === "个人" ? payer?.id || "" : "", isShared: true, includeInFamilyStats: !["TRANSFER", "BALANCE_ADJUSTMENT"].includes(type), goalId: goal?.id || "", merchant: data["商家"] || "", note: data["备注"] || "", splitAllocations: [], importBatchId: file.name, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        const transaction = { id: uid("import"), occurredAt: new Date(data["日期时间"] || Date.now()).toISOString(), type, amountCents, categoryId: category?.id || "", fromAccountId: from?.id || "", toAccountId: to?.id || "", bookkeeperMemberId: bookkeeper?.id || "", payerMemberId: payer?.id || "", ownership: data["个人或家庭"] === "个人" ? "PERSONAL" : "FAMILY", ownerMemberId: data["个人或家庭"] === "个人" ? payer?.id || "" : "", isShared: data["是否共享"] !== "否", includeInFamilyStats: !["TRANSFER", "BALANCE_ADJUSTMENT"].includes(type), goalId: goal?.id || "", merchant: data["商家"] || "", note: data["备注"] || "", splitAllocations: [], importBatchId: file.name, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
         if (type === "EXPENSE" && !transaction.fromAccountId) throw new Error("missing account");
         if (["INCOME","REFUND","REIMBURSEMENT","BALANCE_ADJUSTMENT"].includes(type) && !transaction.toAccountId) throw new Error("missing account");
         if (type === "TRANSFER" && (!transaction.fromAccountId || !transaction.toAccountId || transaction.fromAccountId === transaction.toAccountId)) throw new Error("missing transfer side");
@@ -910,6 +923,9 @@
   function transactionMoney(item) { return `${item.type === "EXPENSE" ? "-" : ["INCOME","REFUND","REIMBURSEMENT"].includes(item.type) ? "+" : ""}${money(item.amountCents)}`; }
   function percentage(value, total) { return total ? `${(value / total * 100).toFixed(1)}%` : "0.0%"; }
   function progress(goal) { return goal.targetAmountCents > 0 ? goal.currentAmountCents / goal.targetAmountCents * 100 : 0; }
+  function formatProgress(goal) { const ratio = progress(goal); return `${(goal.currentAmountCents >= goal.targetAmountCents ? 100 : Math.min(99.99, Math.max(0, ratio))).toFixed(2)}%`; }
+  function effectiveGoalStatus(goal) { return goal.currentAmountCents < goal.targetAmountCents && ["GROWN", "COMPLETED"].includes(goal.status) ? (goal.kind === "CHICKEN" ? "SAVING" : "ACTIVE") : goal.status; }
+  function transactionColorClass(type) { return type === "EXPENSE" ? "finance-expense" : ["INCOME", "REFUND", "REIMBURSEMENT"].includes(type) ? "finance-income" : type === "TRANSFER" ? "finance-transfer" : "finance-adjustment"; }
   function monthKey(value) { const date = value instanceof Date ? value : new Date(value); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`; }
   function shortDate(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "--" : `${date.getMonth() + 1}/${date.getDate()}`; }
   function formatDateTime(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "" : `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")} ${String(date.getHours()).padStart(2,"0")}:${String(date.getMinutes()).padStart(2,"0")}`; }
@@ -930,7 +946,7 @@
 
   function typeName(type) { return ({ INCOME: "收入", EXPENSE: "支出", TRANSFER: "转账", REFUND: "退款", REIMBURSEMENT: "报销", BALANCE_ADJUSTMENT: "余额调整" })[type] || type; }
   function enumType(name) { return ({ 收入: "INCOME", 支出: "EXPENSE", 转账: "TRANSFER", 退款: "REFUND", 报销: "REIMBURSEMENT", 余额调整: "BALANCE_ADJUSTMENT", 账户余额调整: "BALANCE_ADJUSTMENT" })[name] || "EXPENSE"; }
-  function animalName(kind) { return ({ GOOSE: "鹅 · 长期积累", DUCK: "鸭 · 中期目标", CHICKEN: "鸡 · 短期愿望" })[kind] || "资金目标"; }
+  function animalName(kind) { return ({ GOOSE: "鹅 · 长期财富与投资", DUCK: "鸭 · 中长期目标", CHICKEN: "鸡 · 短期愿望和计划" })[kind] || "资金目标"; }
   function goalStatusName(status) { return ({ ACTIVE: "进行中", SAVING: "存钱中", GROWN: "已长成", USED: "已使用", COMPLETED: "已完成", CLOSED: "已关闭" })[status] || status; }
   function accountTypeName(type) { return ({ BANK: "银行卡", WECHAT: "微信", ALIPAY: "支付宝", CASH: "现金", CREDIT_CARD: "信用卡", FAMILY_SHARED: "家庭公共账户", FUND: "基金账户", SECURITIES: "证券账户", OTHER: "其他账户" })[type] || "账户"; }
   function accountIcon(type) { return ({ BANK: "卡", WECHAT: "微", ALIPAY: "支", CASH: "现", CREDIT_CARD: "信", FAMILY_SHARED: "家", FUND: "基", SECURITIES: "证", OTHER: "账" })[type] || "账"; }
@@ -944,7 +960,10 @@
       monthlySummary,
       investmentSummaries,
       effectiveGoals,
-      refreshDerivedState
+      refreshDerivedState,
+      familyAssetTotals,
+      formatProgress,
+      effectiveGoalStatus
     };
   }
 })();
