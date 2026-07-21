@@ -113,4 +113,17 @@ api.refreshDerivedState();
 assert.equal(api.getState().assetSnapshots.length, 1);
 assert.equal(api.getState().investmentSummaries.length, 1);
 assert.equal(api.getState().investmentSummaries[0].totalAssetCents, 98000000);
+
+assert.deepEqual(
+  JSON.parse(JSON.stringify(api.parseRoute("#/funds/members"))),
+  { section: "funds", subtab: "members", view: "members", path: "#/funds/members" },
+  "资金模块使用二级路由"
+);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(api.parseRoute("#/investment/holdings"))),
+  { section: "investment", subtab: "holdings", view: "", path: "#/investment/holdings" },
+  "投资模块使用二级路由"
+);
+assert.equal(api.routeForView("overview").path, "#/funds/overview");
+assert.equal(api.routeForView("investments").path, "#/investment/accounts");
 console.log("finance system scenarios A/B/C passed");

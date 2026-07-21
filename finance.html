@@ -12,7 +12,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>林青资金与投资管理系统</title>
   <link rel="stylesheet" href="style.css?v=20260717-28">
-  <link rel="stylesheet" href="finance-system.css?v=20260721-1">
+  <link rel="stylesheet" href="finance-system.css?v=20260721-2">
 </head>
 <body>
   <div class="app-shell">
@@ -29,6 +29,8 @@
 
       <button id="reset-data-btn" class="topbar-reset" type="button">重置</button>
     </header>
+
+    <nav id="finance-module-tabs" class="finance-module-tabs" aria-label="模块页签" hidden></nav>
 
     <main class="page-content">
       <section id="home-view" class="view is-active">
@@ -48,21 +50,25 @@
       </section>
     </main>
 
+    <button id="finance-quick-add" class="finance-floating-add" type="button" hidden>＋ 快速记账</button>
+
+    <div class="finance-legacy-nav-bridge" aria-hidden="true">
+      <button type="button" data-quick-target="holdings" tabindex="-1"></button>
+      <button type="button" data-quick-target="plans" tabindex="-1"></button>
+    </div>
+
     <nav class="quick-actions finance-main-nav" aria-label="资金与投资管理导航">
-      <button type="button" data-finance-view="overview"><span>⌂</span>资金总览</button>
-      <button type="button" data-finance-view="ledger"><span>▦</span>家庭账本</button>
-      <button type="button" data-finance-view="accounts"><span>▣</span>账户</button>
-      <button type="button" data-finance-view="dreams"><span>♧</span>鹅鸭鸡</button>
-      <button type="button" data-finance-view="investments"><span>¥</span>投资账户</button>
-      <button type="button" data-quick-target="holdings"><span>▤</span>持仓管理</button>
-      <button type="button" data-quick-target="plans"><span>◎</span>交易计划</button>
-      <button type="button" data-finance-view="reports"><span>▥</span>报表</button>
+      <button type="button" data-primary-section="funds"><span>¥</span>资金</button>
+      <button type="button" data-primary-section="dreams"><span>♧</span>鹅鸭鸡</button>
+      <button type="button" data-primary-section="investment"><span>▤</span>投资</button>
+      <button type="button" data-primary-section="reports"><span>▥</span>报表</button>
+      <button type="button" data-primary-section="mine"><span>○</span>我的</button>
     </nav>
   </div>
 
   <script src="data.js?v=20260717-28"></script>
   <script src="sync-auth.js"></script>
   <script src="trade-board.js?v=20260717-28"></script>
-  <script src="finance-system.js?v=20260721-1"></script>
+  <script src="finance-system.js?v=20260721-2"></script>
 </body>
 </html>

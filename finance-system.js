@@ -2,6 +2,7 @@
   "use strict";
 
   const CACHE_KEY = "linqing-finance-system-cache-v1";
+  const NAV_PREFERENCE_KEY = "linqing-finance-navigation-v1";
   const API_ORIGIN = window.location.hostname.endsWith("github.io")
     ? "https://linqing-trading-dashboard.linqingvv5.chatgpt.site"
     : "";
@@ -11,10 +12,14 @@
     overview: ["资金总览", "家庭资金、日常账户、目标与投资资产"],
     ledger: ["家庭账本", "个人与家庭收支明细"],
     accounts: ["账户", "银行卡、微信、支付宝、现金和信用卡"],
+    members: ["家庭成员", "家庭成员、个人账户与共享账目"],
     dreams: ["鹅鸭鸡", "长期积累、中期目标和短期愿望"],
     investments: ["投资账户", "只读取账户资产摘要，不混入家庭账单"],
-    reports: ["报表", "月报、年报和资产趋势"]
+    reports: ["报表", "月报、年报和资产趋势"],
+    mine: ["我的", "当前成员与常用个人入口"]
   };
+  const FUND_TABS = [["overview", "总览"], ["ledger", "账本"], ["accounts", "账户"], ["members", "家庭成员"]];
+  const INVESTMENT_TABS = [["accounts", "账户总览"], ["holdings", "持仓管理"], ["plans", "交易计划"]];
 
   const CATEGORY_SEEDS = [
     ["income-salary", "工资", "INCOME", null], ["income-bonus", "奖金", "INCOME", null],
@@ -41,7 +46,9 @@
     pageTitle: document.getElementById("page-title"),
     pageSubtitle: document.getElementById("page-subtitle"),
     content: document.getElementById("finance-system-content"),
-    view: document.getElementById("finance-system-view")
+    view: document.getElementById("finance-system-view"),
+    moduleTabs: document.getElementById("finance-module-tabs"),
+    quickAdd: document.getElementById("finance-quick-add")
   };
 
   if (!els.content || !els.view) return;
@@ -57,10 +64,10 @@
   let syncText = "正在读取云端保存…";
   let saveTimer = 0;
   let toastTimer = 0;
+  let navPreference = loadNavPreference();
 
   bindEvents();
-  const initialView = hashView();
-  if (VIEW_TITLES[initialView]) openFinanceView(initialView, false);
+  navigateRoute(parseRoute());
   void loadRemoteState();
 
   function defaultState() {
@@ -121,49 +128,103 @@
     document.querySelectorAll("[data-quick-target]").forEach((button) => {
       button.addEventListener("click", () => leaveFinanceMode(button.dataset.quickTarget));
     });
+    document.querySelectorAll("[data-primary-section]").forEach((button) => {
+      button.addEventListener("click", () => openPrimarySection(button.dataset.primarySection));
+    });
+    els.moduleTabs?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-module-tab]");
+      if (!button) return;
+      const [section, tab] = button.dataset.moduleTab.split(":");
+      if (section === "funds") openFinanceView(tab);
+      else openInvestmentTab(tab);
+    });
+    els.quickAdd?.addEventListener("click", openTransactionModal);
     els.content.addEventListener("click", handleContentClick);
     els.content.addEventListener("input", handleContentInput);
     els.content.addEventListener("change", handleContentChange);
     els.content.addEventListener("focusout", handleContentFocusOut);
     window.addEventListener("hashchange", () => {
-      const view = hashView();
-      if (VIEW_TITLES[view]) openFinanceView(view, false);
+      navigateRoute(parseRoute());
     });
+  }
+
+  function openPrimarySection(section) {
+    if (section === "funds") openFinanceView(navPreference.funds || "overview");
+    else if (section === "investment") openInvestmentTab(navPreference.investment || "accounts");
+    else if (section === "dreams") openFinanceView("dreams");
+    else if (section === "reports") openFinanceView("reports");
+    else openFinanceView("mine");
+  }
+
+  function navigateRoute(route, updateHash = true) {
+    if (route.section === "investment" && route.subtab !== "accounts") openInvestmentTab(route.subtab, updateHash);
+    else openFinanceView(route.view, updateHash);
   }
 
   function openFinanceView(view, updateHash = true) {
     currentView = VIEW_TITLES[view] ? view : "overview";
+    const route = routeForView(currentView);
+    if (route.section === "funds") rememberSubtab("funds", route.subtab);
+    if (route.section === "investment") rememberSubtab("investment", route.subtab);
     document.body.classList.add("finance-mode");
     els.view.classList.add("is-active");
     const [title, subtitle] = VIEW_TITLES[currentView];
     els.pageTitle.textContent = title;
     els.pageSubtitle.textContent = subtitle;
-    setActiveNav(currentView);
-    if (updateHash) history.replaceState(null, "", `#/` + currentView);
+    setActiveNav(route.section);
+    updateModuleTabs(route.section, route.subtab);
+    if (els.quickAdd) els.quickAdd.hidden = route.section !== "funds";
+    if (updateHash) history.replaceState(null, "", route.path);
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function openInvestmentTab(tab, updateHash = true) {
+    const subtab = ["accounts", "holdings", "plans"].includes(tab) ? tab : "accounts";
+    rememberSubtab("investment", subtab);
+    if (subtab === "accounts") { openFinanceView("investments", updateHash); return; }
+    document.body.classList.remove("finance-mode");
+    els.view.classList.remove("is-active");
+    setActiveNav("investment");
+    updateModuleTabs("investment", subtab);
+    if (els.quickAdd) els.quickAdd.hidden = true;
+    if (updateHash) history.replaceState(null, "", `#/investment/${subtab}`);
+    document.querySelector(`.finance-legacy-nav-bridge [data-quick-target="${subtab}"]`)?.click();
   }
 
   function leaveFinanceMode(target) {
     document.body.classList.remove("finance-mode");
     els.view.classList.remove("is-active");
-    setActiveNav(target === "holdings" ? "holdings" : target === "plans" ? "plans" : "");
-    if (location.hash.startsWith("#/")) history.replaceState(null, "", location.pathname + location.search);
+    if (["holdings", "plans"].includes(target)) {
+      rememberSubtab("investment", target);
+      setActiveNav("investment");
+      updateModuleTabs("investment", target);
+      if (els.quickAdd) els.quickAdd.hidden = true;
+      history.replaceState(null, "", `#/investment/${target}`);
+    }
   }
 
-  function setActiveNav(view) {
+  function setActiveNav(section) {
     document.querySelectorAll(".finance-main-nav button").forEach((button) => {
-      const key = button.dataset.financeView || button.dataset.quickTarget;
-      button.classList.toggle("is-finance-active", key === view);
+      button.classList.toggle("is-finance-active", button.dataset.primarySection === section);
     });
+  }
+
+  function updateModuleTabs(section, subtab) {
+    if (!els.moduleTabs) return;
+    const tabs = section === "funds" ? FUND_TABS : section === "investment" ? INVESTMENT_TABS : [];
+    els.moduleTabs.hidden = !tabs.length;
+    els.moduleTabs.innerHTML = tabs.map(([key, label]) => `<button type="button" class="${key === subtab ? "is-active" : ""}" data-module-tab="${section}:${key}">${escapeHtml(label)}</button>`).join("");
   }
 
   function render() {
     if (currentView === "ledger") renderLedger();
     else if (currentView === "accounts") renderAccounts();
+    else if (currentView === "members") renderMembers();
     else if (currentView === "dreams") renderDreams();
     else if (currentView === "investments") renderInvestments();
     else if (currentView === "reports") renderReports();
+    else if (currentView === "mine") renderMine();
     else renderOverview();
   }
 
@@ -238,11 +299,41 @@
           <div class="finance-panel-head"><strong>日常账户</strong><span>${state.accounts.filter((item) => !item.isArchived).length} 个</span></div>
           <div class="finance-account-list">${state.accounts.filter((item) => !item.isArchived).map((account) => accountRow(account, month[account.id], true)).join("")}</div>
         </section>
+      </div>`;
+  }
+
+  function renderMembers() {
+    els.content.innerHTML = `
+      <div class="finance-page">
+        ${pageHead("家庭成员", "成员身份、个人账户和共享账目", `<button class="finance-primary" data-add-member>＋ 家庭成员</button>`)}
         <section class="finance-panel" style="margin:0 16px 18px">
           <div class="finance-panel-head"><strong>家庭成员</strong><span>${state.members.filter((item) => item.isActive).length} 人</span></div>
-          <div class="finance-account-list">${state.members.filter((item) => item.isActive).map((member) => `<div class="finance-account-row"><div><span>${escapeHtml(member.role)}</span><strong>${escapeHtml(member.displayName)}${member.isCurrentUser ? " · 当前用户" : ""}</strong></div><div><span>个人账户</span><strong>${state.accounts.filter((account) => account.ownerMemberId === member.id && !account.isArchived).length} 个</strong></div><div><span>本月支出</span><strong>${money(sum(state.transactions.filter((item) => item.payerMemberId === member.id && item.type === "EXPENSE" && monthKey(item.occurredAt) === ledgerMonth).map((item) => item.amountCents)))}</strong></div><div><span>共享账目</span><strong>${state.transactions.filter((item) => item.bookkeeperMemberId === member.id && item.isShared).length} 条</strong></div></div>`).join("")}</div>
+          <div class="finance-account-list">${memberRows()}</div>
         </section>
       </div>`;
+  }
+
+  function renderMine() {
+    const me = state.members.find((item) => item.isCurrentUser) || state.members[0];
+    const personalAccounts = state.accounts.filter((account) => account.ownerMemberId === me?.id && !account.isArchived);
+    const personalTransactions = state.transactions.filter((item) => item.ownerMemberId === me?.id || item.payerMemberId === me?.id || item.bookkeeperMemberId === me?.id);
+    els.content.innerHTML = `
+      <div class="finance-page">
+        ${pageHead("我的", "当前成员与常用个人入口")}
+        <section class="finance-panel finance-profile-card">
+          <div class="finance-profile-avatar">${escapeHtml((me?.displayName || "我").slice(0, 1))}</div>
+          <div><span>${escapeHtml(me?.role || "家庭成员")}</span><h2>${escapeHtml(me?.displayName || "我")}</h2><p>${personalAccounts.length} 个账户 · ${personalTransactions.length} 条相关账目</p></div>
+        </section>
+        <section class="finance-panel finance-mine-links">
+          <button type="button" data-open-view="ledger"><span>我的账本</span><b>查看个人与家庭明细 ›</b></button>
+          <button type="button" data-open-view="accounts"><span>我的账户</span><b>余额与本月资金流 ›</b></button>
+          <button type="button" data-open-view="members"><span>家庭成员</span><b>成员与共享账目 ›</b></button>
+        </section>
+      </div>`;
+  }
+
+  function memberRows() {
+    return state.members.filter((item) => item.isActive).map((member) => `<div class="finance-account-row"><div><span>${escapeHtml(member.role)}</span><strong>${escapeHtml(member.displayName)}${member.isCurrentUser ? " · 当前用户" : ""}</strong></div><div><span>个人账户</span><strong>${state.accounts.filter((account) => account.ownerMemberId === member.id && !account.isArchived).length} 个</strong></div><div><span>本月支出</span><strong>${money(sum(state.transactions.filter((item) => item.payerMemberId === member.id && item.type === "EXPENSE" && monthKey(item.occurredAt) === ledgerMonth).map((item) => item.amountCents)))}</strong></div><div><span>共享账目</span><strong>${state.transactions.filter((item) => item.bookkeeperMemberId === member.id && item.isShared).length} 条</strong></div></div>`).join("");
   }
 
   function renderDreams() {
@@ -910,7 +1001,42 @@
     toastTimer = window.setTimeout(() => toast.remove(), 2600);
   }
 
-  function hashView() { return location.hash.replace(/^#\//, ""); }
+  function parseRoute(hash = location.hash) {
+    const path = String(hash || "").replace(/^#\/?/, "").replace(/^\//, "");
+    const [section, subtab] = path.split("/");
+    if (section === "funds") {
+      const tab = FUND_TABS.some(([key]) => key === subtab) ? subtab : navPreference.funds || "overview";
+      return { section: "funds", subtab: tab, view: tab, path: `#/funds/${tab}` };
+    }
+    if (section === "investment") {
+      const tab = INVESTMENT_TABS.some(([key]) => key === subtab) ? subtab : navPreference.investment || "accounts";
+      return { section: "investment", subtab: tab, view: tab === "accounts" ? "investments" : "", path: `#/investment/${tab}` };
+    }
+    if (["dreams", "reports", "mine"].includes(section)) return { section, subtab: "", view: section, path: `#/${section}` };
+    const legacy = { overview: ["funds", "overview"], ledger: ["funds", "ledger"], accounts: ["funds", "accounts"], members: ["funds", "members"], investments: ["investment", "accounts"], holdings: ["investment", "holdings"], plans: ["investment", "plans"] }[section];
+    if (legacy) return legacy[0] === "funds" ? { section: "funds", subtab: legacy[1], view: legacy[1], path: `#/funds/${legacy[1]}` } : { section: "investment", subtab: legacy[1], view: legacy[1] === "accounts" ? "investments" : "", path: `#/investment/${legacy[1]}` };
+    const tab = navPreference.funds || "overview";
+    return { section: "funds", subtab: tab, view: tab, path: `#/funds/${tab}` };
+  }
+
+  function routeForView(view) {
+    if (FUND_TABS.some(([key]) => key === view)) return { section: "funds", subtab: view, view, path: `#/funds/${view}` };
+    if (view === "investments") return { section: "investment", subtab: "accounts", view, path: "#/investment/accounts" };
+    return { section: view, subtab: "", view, path: `#/${view}` };
+  }
+
+  function loadNavPreference() {
+    try {
+      const value = JSON.parse(localStorage.getItem(NAV_PREFERENCE_KEY) || "null");
+      return { funds: FUND_TABS.some(([key]) => key === value?.funds) ? value.funds : "overview", investment: INVESTMENT_TABS.some(([key]) => key === value?.investment) ? value.investment : "accounts" };
+    } catch (_) { return { funds: "overview", investment: "accounts" }; }
+  }
+
+  function rememberSubtab(section, tab) {
+    if (!navPreference || navPreference[section] === tab) return;
+    navPreference = { ...navPreference, [section]: tab };
+    localStorage.setItem(NAV_PREFERENCE_KEY, JSON.stringify(navPreference));
+  }
   function accountById(id) { return state.accounts.find((item) => item.id === id); }
   function goalById(id) { return state.goals.find((item) => item.id === id); }
   function categoryById(id) { return state.categories.find((item) => item.id === id); }
@@ -963,7 +1089,9 @@
       refreshDerivedState,
       familyAssetTotals,
       formatProgress,
-      effectiveGoalStatus
+      effectiveGoalStatus,
+      parseRoute,
+      routeForView
     };
   }
 })();
