@@ -3,15 +3,16 @@
 <head>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="交易驾驶舱">
+  <meta name="apple-mobile-web-app-title" content="资金与投资">
   <meta name="theme-color" content="#e53935">
   <link rel="manifest" href="finance-manifest.webmanifest?v=20260717-28">
   <link rel="icon" href="app-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app-icon.svg">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>林青交易驾驶舱</title>
+  <title>林青资金与投资管理系统</title>
   <link rel="stylesheet" href="style.css?v=20260717-28">
+  <link rel="stylesheet" href="finance-system.css?v=20260721-1">
 </head>
 <body>
   <div class="app-shell">
@@ -41,17 +42,27 @@
       <section id="funds-view" class="view">
         <div id="funds-content"></div>
       </section>
+
+      <section id="finance-system-view" class="view finance-system-view" aria-live="polite">
+        <div id="finance-system-content"></div>
+      </section>
     </main>
 
-    <nav class="quick-actions" aria-label="快捷功能">
+    <nav class="quick-actions finance-main-nav" aria-label="资金与投资管理导航">
+      <button type="button" data-finance-view="overview"><span>⌂</span>资金总览</button>
+      <button type="button" data-finance-view="ledger"><span>▦</span>家庭账本</button>
+      <button type="button" data-finance-view="accounts"><span>▣</span>账户</button>
+      <button type="button" data-finance-view="dreams"><span>♧</span>鹅鸭鸡</button>
+      <button type="button" data-finance-view="investments"><span>¥</span>投资账户</button>
       <button type="button" data-quick-target="holdings"><span>▤</span>持仓管理</button>
       <button type="button" data-quick-target="plans"><span>◎</span>交易计划</button>
-      <button type="button" data-quick-target="funds"><span>¥</span>资金管理</button>
+      <button type="button" data-finance-view="reports"><span>▥</span>报表</button>
     </nav>
   </div>
 
   <script src="data.js?v=20260717-28"></script>
   <script src="sync-auth.js"></script>
   <script src="trade-board.js?v=20260717-28"></script>
+  <script src="finance-system.js?v=20260721-1"></script>
 </body>
 </html>

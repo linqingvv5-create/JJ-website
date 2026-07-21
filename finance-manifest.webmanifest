@@ -1,8 +1,8 @@
 {
   "id": "./finance.html",
-  "name": "林青交易驾驶舱",
-  "short_name": "交易驾驶舱",
-  "description": "手机与电脑同步使用的股票持仓和交易计划面板。",
+  "name": "林青资金与投资管理系统",
+  "short_name": "资金与投资",
+  "description": "家庭账本、账户、资金目标与股票投资统一查看、分域管理。",
   "start_url": "./finance.html",
   "scope": "./",
   "display": "standalone",
@@ -18,9 +18,14 @@
   ],
   "shortcuts": [
     {
-      "name": "打开交易面板",
-      "short_name": "交易面板",
-      "url": "./finance.html"
+      "name": "打开资金总览",
+      "short_name": "资金总览",
+      "url": "./finance.html#/overview"
+    },
+    {
+      "name": "打开家庭账本",
+      "short_name": "家庭账本",
+      "url": "./finance.html#/ledger"
     }
   ]
 }

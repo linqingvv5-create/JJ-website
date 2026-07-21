@@ -19,8 +19,10 @@ New-Item -ItemType Directory -Path $server -Force | Out-Null
 $assets = @(
   'finance.html',
   'style.css',
+  'finance-system.css',
   'data.js',
   'trade-board.js',
+  'finance-system.js',
   'sync-auth.js',
   'manifest.webmanifest',
   'finance-manifest.webmanifest',
