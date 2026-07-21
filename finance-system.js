@@ -84,14 +84,21 @@
         accountSeed("account-credit", "信用卡", "CREDIT_CARD", "member-me", 0, true)
       ],
       transactions: [],
+      dreamAnimals: [
+        animalSeed("animal-big-goose", "GOOSE", "大鹅", "大鹅"),
+        animalSeed("animal-small-goose", "GOOSE", "小鹅", "小鹅"),
+        animalSeed("animal-house-duck", "DUCK", "买房鸭", "买房鸭"),
+        animalSeed("animal-travel-chicken", "CHICKEN", "旅游鸡", "旅游鸡")
+      ],
       goals: [
-        goalSeed("goal-big-goose", "GOOSE", "大鹅", 1000000000, 0, "长期养老投资，不动本金和收益", "ACTIVE"),
-        goalSeed("goal-small-goose", "GOOSE", "小鹅", 100000000, 0, "关联现有波段投资账户", "ACTIVE", true),
-        goalSeed("goal-house-duck", "DUCK", "买房鸭", 200000000, 0, "中长期买房资金", "ACTIVE"),
-        goalSeed("goal-travel-chicken", "CHICKEN", "旅游鸡", 3000000, 0, "短期旅行计划", "SAVING")
+        goalSeed("goal-big-goose", "animal-big-goose", "GOOSE", "大鹅", 1000000000, 0, "长期养老投资，不动本金和收益", "ACTIVE", false, ["account-family"]),
+        goalSeed("goal-small-goose", "animal-small-goose", "GOOSE", "小鹅", 100000000, 0, "关联现有波段投资账户", "ACTIVE", true, []),
+        goalSeed("goal-house-duck", "animal-house-duck", "DUCK", "买房鸭", 200000000, 0, "中长期买房资金", "ACTIVE", false, ["account-family"]),
+        goalSeed("goal-travel-chicken", "animal-travel-chicken", "CHICKEN", "旅游鸡", 3000000, 0, "短期旅行计划", "SAVING", false, ["account-family"])
       ],
       goalEntries: [],
-      assetSnapshots: []
+      assetSnapshots: [],
+      investmentSummaries: []
     };
   }
 
@@ -99,8 +106,12 @@
     return { id, name, type, ownerMemberId, openingBalanceCents: balanceCents, currentBalanceCents: balanceCents, includeInFamilyAssets, isShared: type === "FAMILY_SHARED", isArchived: false, updatedAt: new Date().toISOString() };
   }
 
-  function goalSeed(id, kind, name, targetAmountCents, allocatedAmountCents, note, status, linkedInvestment) {
-    return { id, kind, name, targetAmountCents, allocatedAmountCents, spentAmountCents: 0, principalCents: allocatedAmountCents, earningsCents: 0, status, note, linkedAccountIds: [], linkedInvestmentAccountIds: linkedInvestment ? ["*"] : [], updatedAt: new Date().toISOString() };
+  function animalSeed(id, kind, name, visualVariant) {
+    return { id, kind, name, ownerMemberId: "member-me", visualVariant, sortOrder: 0, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  }
+
+  function goalSeed(id, animalId, kind, name, targetAmountCents, allocatedAmountCents, note, status, linkedInvestment, linkedAccountIds) {
+    return { id, animalId, kind, name, targetAmountCents, allocatedAmountCents, spentAmountCents: 0, principalCents: allocatedAmountCents, earningsCents: 0, status, note, targetDate: "", linkedAccountIds: linkedAccountIds || [], linkedInvestmentAccountIds: linkedInvestment ? ["*"] : [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   }
 
   function bindEvents() {
@@ -204,7 +215,7 @@
       <div class="finance-page">
         ${pageHead("家庭账本", "表格可搜索、筛选、按月查看，备注可直接编辑", `<button class="finance-secondary" data-export-csv>导出 CSV</button><button class="finance-secondary" data-import-csv>导入 CSV</button><input type="file" accept=".csv,text/csv" data-csv-file hidden><button class="finance-primary" data-add-transaction>＋ 记一笔</button>`)}
         <div class="finance-filters">
-          ${scopeChip("me", "我的账本")}${scopeChip("partner", "对方账本")}${scopeChip("family", "家庭账本")}
+          ${scopeChip("me", "我的账本")}${state.members.filter((item) => !item.isCurrentUser && item.isActive).map((item) => scopeChip(`member:${item.id}`, `${item.displayName}账本`)).join("")}${scopeChip("family", "家庭账本")}
           <input type="month" data-ledger-month value="${escapeAttribute(ledgerMonth)}">
           <select data-ledger-type><option value="ALL">全部类型</option>${optionList([["INCOME","收入"],["EXPENSE","支出"],["TRANSFER","转账"],["REFUND","退款"],["REIMBURSEMENT","报销"],["BALANCE_ADJUSTMENT","余额调整"]], ledgerType)}</select>
           <input type="search" data-ledger-search value="${escapeAttribute(ledgerSearch)}" placeholder="搜索分类、账户、商家或备注">
@@ -223,10 +234,14 @@
     const month = monthlyAccountFlows(ledgerMonth);
     els.content.innerHTML = `
       <div class="finance-page">
-        ${pageHead("账户", "信用卡消费算支出，还款只算账户转账", `<button class="finance-secondary" data-add-member>＋ 家庭成员</button><button class="finance-primary" data-add-account>＋ 添加账户</button>`)}
+        ${pageHead("账户", "信用卡消费算支出，还款只算账户转账", `<button class="finance-secondary" data-add-member>＋ 家庭成员</button><button class="finance-secondary" data-add-category>＋ 自定义分类</button><button class="finance-primary" data-add-account>＋ 添加账户</button>`)}
         <section class="finance-panel" style="margin:0 16px 18px">
           <div class="finance-panel-head"><strong>日常账户</strong><span>${state.accounts.filter((item) => !item.isArchived).length} 个</span></div>
-          <div class="finance-account-list">${state.accounts.filter((item) => !item.isArchived).map((account) => accountRow(account, month[account.id])).join("")}</div>
+          <div class="finance-account-list">${state.accounts.filter((item) => !item.isArchived).map((account) => accountRow(account, month[account.id], true)).join("")}</div>
+        </section>
+        <section class="finance-panel" style="margin:0 16px 18px">
+          <div class="finance-panel-head"><strong>家庭成员</strong><span>${state.members.filter((item) => item.isActive).length} 人</span></div>
+          <div class="finance-account-list">${state.members.filter((item) => item.isActive).map((member) => `<div class="finance-account-row"><div><span>${escapeHtml(member.role)}</span><strong>${escapeHtml(member.displayName)}${member.isCurrentUser ? " · 当前用户" : ""}</strong></div><div><span>个人账户</span><strong>${state.accounts.filter((account) => account.ownerMemberId === member.id && !account.isArchived).length} 个</strong></div><div><span>本月支出</span><strong>${money(sum(state.transactions.filter((item) => item.payerMemberId === member.id && item.type === "EXPENSE" && monthKey(item.occurredAt) === ledgerMonth).map((item) => item.amountCents)))}</strong></div><div><span>共享账目</span><strong>${state.transactions.filter((item) => item.bookkeeperMemberId === member.id && item.isShared).length} 条</strong></div></div>`).join("")}</div>
         </section>
       </div>`;
   }
@@ -264,7 +279,7 @@
   }
 
   function renderReports() {
-    const months = lastMonths(6).map((month) => ({ month, ...monthlySummary(month) }));
+    const months = lastMonths(12).map((month) => ({ month, ...monthlySummary(month) }));
     const current = monthlySummary(ledgerMonth);
     const max = Math.max(1, ...months.flatMap((item) => [item.income, item.expense]));
     const required = categoryExpense(current.transactions, "expense-required");
@@ -278,12 +293,16 @@
         </section>
         <div class="finance-section-grid">
           <section class="finance-panel">
-            <div class="finance-panel-head"><strong>近六个月趋势</strong><span>收入 / 支出</span></div>
+            <div class="finance-panel-head"><strong>年度趋势</strong><span>近十二个月收入 / 支出</span></div>
             <div class="finance-report-bars">${months.map((item) => reportBars(item, max)).join("")}</div>
           </section>
           <section class="finance-panel">
             <div class="finance-panel-head"><strong>成员支出</strong><span>${escapeHtml(ledgerMonth)}</span></div>
             <div class="finance-account-list">${state.members.map((member) => memberExpenseRow(member, current.transactions)).join("")}</div>
+          </section>
+          <section class="finance-panel">
+            <div class="finance-panel-head"><strong>资产报表</strong><span>日常账户 + 投资摘要</span></div>
+            <div class="finance-account-list">${state.assetSnapshots.slice(0, 6).map((item) => `<div class="finance-account-row"><div><span>${escapeHtml(item.snapshotDate)}</span><strong>家庭净资产</strong></div><div><span>资产</span><strong>${money(item.assetCents)}</strong></div><div><span>负债</span><strong>${money(item.liabilityCents)}</strong></div><div><span>净资产</span><strong>${money(item.netAssetCents)}</strong></div></div>`).join("") || empty("保存一笔账后生成资产快照。")}</div>
           </section>
         </div>
       </div>`;
@@ -295,9 +314,23 @@
     if (event.target.closest("[data-add-transaction]")) { openTransactionModal(); return; }
     if (event.target.closest("[data-add-member]")) { openMemberModal(); return; }
     if (event.target.closest("[data-add-account]")) { openAccountModal(); return; }
+    if (event.target.closest("[data-add-category]")) { openCategoryModal(); return; }
+    const editAccount = event.target.closest("[data-edit-account]");
+    if (editAccount) { openAccountModal(editAccount.dataset.editAccount); return; }
+    const adjustAccount = event.target.closest("[data-adjust-account]");
+    if (adjustAccount) { openBalanceAdjustmentModal(adjustAccount.dataset.adjustAccount); return; }
     if (event.target.closest("[data-add-goal]")) { openGoalModal(); return; }
+    const editGoal = event.target.closest("[data-edit-goal]");
+    if (editGoal) { openGoalModal(editGoal.dataset.editGoal); return; }
+    const goalHistory = event.target.closest("[data-goal-history]");
+    if (goalHistory) { openGoalHistory(goalHistory.dataset.goalHistory); return; }
     const allocate = event.target.closest("[data-allocate-goal]");
-    if (allocate) { openTransactionModal({ type: "TRANSFER", goalId: allocate.dataset.allocateGoal }); return; }
+    if (allocate) {
+      const goal = goalById(allocate.dataset.allocateGoal);
+      if (!goal?.linkedAccountIds?.length) { window.alert("请先编辑目标并关联至少一个真实账户。"); return; }
+      openTransactionModal({ type: "TRANSFER", goalId: goal.id, toAccountId: goal.linkedAccountIds[0] });
+      return;
+    }
     const spend = event.target.closest("[data-spend-goal]");
     if (spend) { openTransactionModal({ type: "EXPENSE", goalId: spend.dataset.spendGoal, categoryId: "expense-dream" }); return; }
     const scope = event.target.closest("[data-ledger-scope]");
@@ -312,13 +345,14 @@
     }
     if (event.target.closest("[data-export-csv]")) { exportCsv(); return; }
     if (event.target.closest("[data-import-csv]")) { els.content.querySelector("[data-csv-file]")?.click(); return; }
-    if (event.target.closest("[data-refresh-investment]")) { renderInvestments(); showToast("投资账户摘要已刷新"); }
+    if (event.target.closest("[data-refresh-investment]")) { refreshDerivedState(); queueSave(); renderInvestments(); showToast("投资账户摘要已刷新"); }
   }
 
   function handleContentInput(event) {
     if (event.target.matches("[data-ledger-search]")) {
       ledgerSearch = event.target.value;
-      renderLedger();
+      const needle = ledgerSearch.trim().toLowerCase();
+      els.content.querySelectorAll(".finance-table tbody tr").forEach((row) => { row.hidden = Boolean(needle) && !row.textContent.toLowerCase().includes(needle); });
     }
   }
 
@@ -407,8 +441,11 @@
     if (!Number.isFinite(amountCents) || amountCents <= 0) throw new Error("请输入正确金额。");
     if (type === "EXPENSE" && !fromAccountId) throw new Error("支出必须选择支付账户。");
     if (["INCOME", "REFUND", "REIMBURSEMENT", "BALANCE_ADJUSTMENT"].includes(type) && !toAccountId) throw new Error("请选择资金进入的账户。");
-    if (type === "TRANSFER" && (!fromAccountId || (!toAccountId && !goalId))) throw new Error("转账必须选择转出账户，以及转入账户或鹅鸭鸡目标。");
+    if (type === "TRANSFER" && (!fromAccountId || !toAccountId)) throw new Error("转账必须同时选择转出账户和转入账户。");
     if (type === "TRANSFER" && fromAccountId === toAccountId) throw new Error("转出和转入账户不能相同。");
+    const goal = goalById(goalId);
+    if (type === "TRANSFER" && goal && !goal.linkedAccountIds?.includes(toAccountId)) throw new Error("转入账户必须是该鹅鸭鸡目标已关联的真实账户。");
+    if (type === "EXPENSE" && goal && !goal.linkedAccountIds?.includes(fromAccountId)) throw new Error("目标支出必须使用该目标已关联的真实账户。");
     return {
       id: uid("transaction"),
       occurredAt: new Date(String(values.get("occurredAt"))).toISOString(),
@@ -436,7 +473,11 @@
     const from = accountById(transaction.fromAccountId);
     const to = accountById(transaction.toAccountId);
     if (["EXPENSE", "TRANSFER"].includes(transaction.type) && from) from.currentBalanceCents -= transaction.amountCents;
-    if (["INCOME", "REFUND", "REIMBURSEMENT", "BALANCE_ADJUSTMENT", "TRANSFER"].includes(transaction.type) && to) to.currentBalanceCents += transaction.amountCents;
+    if (["INCOME", "REFUND", "REIMBURSEMENT", "TRANSFER"].includes(transaction.type) && to) to.currentBalanceCents += transaction.amountCents;
+    if (transaction.type === "BALANCE_ADJUSTMENT") {
+      const target = to || from;
+      if (target) target.currentBalanceCents += Number.isFinite(Number(transaction.adjustmentDeltaCents)) ? Number(transaction.adjustmentDeltaCents) : transaction.amountCents;
+    }
     if (from) from.updatedAt = new Date().toISOString();
     if (to) to.updatedAt = new Date().toISOString();
     const goal = goalById(transaction.goalId);
@@ -445,10 +486,12 @@
         goal.allocatedAmountCents += transaction.amountCents;
         goal.principalCents += transaction.amountCents;
         addGoalEntry(goal.id, "ALLOCATION", transaction.amountCents, transaction.id);
+        if (goal.kind === "CHICKEN" && goal.allocatedAmountCents >= goal.targetAmountCents && goal.status === "SAVING") goal.status = "GROWN";
       } else if (transaction.type === "EXPENSE") {
         goal.spentAmountCents += transaction.amountCents;
         goal.allocatedAmountCents = Math.max(0, goal.allocatedAmountCents - transaction.amountCents);
         addGoalEntry(goal.id, "SPEND", -transaction.amountCents, transaction.id);
+        if (goal.kind === "CHICKEN" && !["COMPLETED", "CLOSED"].includes(goal.status)) goal.status = "USED";
       }
       goal.updatedAt = new Date().toISOString();
     }
@@ -460,21 +503,61 @@
     state.goalEntries.unshift({ id: uid("goal-entry"), goalId, type, amountCents, transactionId, occurredAt: new Date().toISOString() });
   }
 
-  function openAccountModal() {
-    const modal = createModal("添加账户", `<form class="finance-form">
-      <label class="is-wide"><span>账户名称</span><input name="name" required placeholder="例如：招商银行工资卡"></label>
-      <label><span>账户类型</span><select name="type">${optionList([["BANK","银行卡"],["WECHAT","微信"],["ALIPAY","支付宝"],["CASH","现金"],["CREDIT_CARD","信用卡"],["FAMILY_SHARED","家庭公共账户"],["FUND","基金账户"],["SECURITIES","证券账户"],["OTHER","其他账户"]], "BANK")}</select></label>
-      <label><span>所属成员</span><select name="ownerMemberId">${memberOptions()}</select></label>
-      <label><span>当前余额（元）</span><input name="balance" type="number" step="0.01" value="0" required></label>
-      <label><span>计入家庭总资产</span><select name="include"><option value="true">计入</option><option value="false">不计入</option></select></label>
+  function openAccountModal(accountId) {
+    const existing = accountById(accountId);
+    const modal = createModal(existing ? "编辑账户" : "添加账户", `<form class="finance-form">
+      <label class="is-wide"><span>账户名称</span><input name="name" value="${escapeAttribute(existing?.name || "")}" required placeholder="例如：招商银行工资卡"></label>
+      <label><span>账户类型</span><select name="type">${optionList([["BANK","银行卡"],["WECHAT","微信"],["ALIPAY","支付宝"],["CASH","现金"],["CREDIT_CARD","信用卡"],["FAMILY_SHARED","家庭公共账户"],["FUND","基金账户"],["SECURITIES","证券账户"],["OTHER","其他账户"]], existing?.type || "BANK")}</select></label>
+      <label><span>所属成员</span><select name="ownerMemberId">${memberOptions(existing?.ownerMemberId)}</select></label>
+      ${existing ? "" : `<label><span>初始余额（元）</span><input name="balance" type="number" step="0.01" value="0" required></label>`}
+      <label><span>是否共享</span><select name="isShared"><option value="true" ${existing?.isShared ? "selected" : ""}>家庭共享</option><option value="false" ${existing && !existing.isShared ? "selected" : ""}>个人私有</option></select></label>
+      <label><span>计入家庭总资产</span><select name="include"><option value="true" ${existing?.includeInFamilyAssets !== false ? "selected" : ""}>计入</option><option value="false" ${existing?.includeInFamilyAssets === false ? "selected" : ""}>不计入</option></select></label>
+      ${existing ? `<label><span>状态</span><select name="isArchived"><option value="false">正常使用</option><option value="true" ${existing.isArchived ? "selected" : ""}>停用归档</option></select></label>` : ""}
       <div class="finance-form-actions"><button type="button" class="finance-secondary" data-close-finance-modal>取消</button><button class="finance-primary" type="submit">保存账户</button></div>
     </form>`);
     modal.querySelector("form").addEventListener("submit", (event) => {
       event.preventDefault();
       const values = new FormData(event.currentTarget);
-      const balance = Math.round(Number(values.get("balance")) * 100);
-      state.accounts.push(accountSeed(uid("account"), String(values.get("name")).trim(), String(values.get("type")), String(values.get("ownerMemberId")), Number.isFinite(balance) ? balance : 0, String(values.get("include")) === "true"));
-      closeModal(modal); saveNow(); render(); showToast("账户已添加");
+      if (existing) {
+        existing.name = String(values.get("name")).trim(); existing.type = String(values.get("type")); existing.ownerMemberId = String(values.get("ownerMemberId"));
+        existing.isShared = String(values.get("isShared")) === "true"; existing.includeInFamilyAssets = String(values.get("include")) === "true"; existing.isArchived = String(values.get("isArchived")) === "true"; existing.updatedAt = new Date().toISOString();
+      } else {
+        const balance = Math.round(Number(values.get("balance")) * 100);
+        const account = accountSeed(uid("account"), String(values.get("name")).trim(), String(values.get("type")), String(values.get("ownerMemberId")), Number.isFinite(balance) ? balance : 0, String(values.get("include")) === "true");
+        account.isShared = String(values.get("isShared")) === "true"; state.accounts.push(account);
+      }
+      closeModal(modal); saveNow(); render(); showToast(existing ? "账户已更新" : "账户已添加");
+    });
+  }
+
+  function openBalanceAdjustmentModal(accountId) {
+    const account = accountById(accountId); if (!account) return;
+    const modal = createModal("调整账户余额", `<form class="finance-form">
+      <div class="is-wide"><span>当前余额</span><strong style="display:block;font-size:24px;margin-top:6px">${money(account.currentBalanceCents)}</strong></div>
+      <label class="is-wide"><span>调整后的实际余额（元）</span><input class="finance-amount-input" name="newBalance" type="number" step="0.01" value="${(account.currentBalanceCents / 100).toFixed(2)}" required></label>
+      <label class="is-wide"><span>调整原因</span><input name="note" required placeholder="例如：对账修正"></label>
+      <div class="finance-form-actions"><button type="button" class="finance-secondary" data-close-finance-modal>取消</button><button class="finance-primary" type="submit">保存调整</button></div>
+    </form>`);
+    modal.querySelector("form").addEventListener("submit", (event) => {
+      event.preventDefault(); const values = new FormData(event.currentTarget); const next = Math.round(Number(values.get("newBalance")) * 100); const delta = next - account.currentBalanceCents;
+      if (!Number.isFinite(next) || delta === 0) { closeModal(modal); return; }
+      const member = state.members.find((item) => item.isCurrentUser) || state.members[0];
+      applyTransaction({ id: uid("adjustment"), occurredAt: new Date().toISOString(), type: "BALANCE_ADJUSTMENT", amountCents: Math.abs(delta), adjustmentDeltaCents: delta, categoryId: "", fromAccountId: delta < 0 ? account.id : "", toAccountId: delta > 0 ? account.id : "", bookkeeperMemberId: member?.id || "", payerMemberId: member?.id || "", ownership: "PERSONAL", ownerMemberId: account.ownerMemberId, isShared: account.isShared, includeInFamilyStats: false, goalId: "", merchant: "", note: String(values.get("note") || ""), splitAllocations: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      closeModal(modal); saveNow(); renderAccounts(); showToast("余额调整已单独记录，不计收入或支出");
+    });
+  }
+
+  function openCategoryModal() {
+    const modal = createModal("自定义分类", `<form class="finance-form">
+      <label><span>收支方向</span><select name="direction"><option value="EXPENSE">支出</option><option value="INCOME">收入</option></select></label>
+      <label><span>一级分类（可选）</span><select name="parentId"><option value="">作为一级分类</option>${state.categories.filter((item) => !item.parentId).map((item) => `<option value="${escapeAttribute(item.id)}" data-direction="${item.direction}">${escapeHtml(item.name)}</option>`).join("")}</select></label>
+      <label class="is-wide"><span>分类名称</span><input name="name" required placeholder="输入自定义分类"></label>
+      <div class="finance-form-actions"><button type="button" class="finance-secondary" data-close-finance-modal>取消</button><button class="finance-primary" type="submit">保存分类</button></div>
+    </form>`);
+    modal.querySelector("form").addEventListener("submit", (event) => {
+      event.preventDefault(); const values = new FormData(event.currentTarget); const parent = categoryById(String(values.get("parentId") || "")); const direction = parent?.direction || String(values.get("direction"));
+      state.categories.push({ id: uid("category"), name: String(values.get("name")).trim(), direction, parentId: parent?.id || null, scope: "CUSTOM", ownerMemberId: "", sortOrder: state.categories.length + 1, isActive: true });
+      closeModal(modal); saveNow(); renderAccounts(); showToast("自定义分类已添加");
     });
   }
 
@@ -492,22 +575,40 @@
     });
   }
 
-  function openGoalModal() {
-    const modal = createModal("新建鹅鸭鸡目标", `<form class="finance-form">
-      <label class="is-wide"><span>目标名称</span><input name="name" required placeholder="例如：装修鸭"></label>
-      <label><span>类型</span><select name="kind"><option value="GOOSE">鹅 · 长期积累</option><option value="DUCK">鸭 · 中期目标</option><option value="CHICKEN">鸡 · 短期愿望</option></select></label>
-      <label><span>目标金额（元）</span><input name="target" type="number" min="1" step="0.01" required></label>
-      <label class="is-wide"><span>说明</span><input name="note" placeholder="目标用途或计划"></label>
-      <div class="finance-form-actions"><button type="button" class="finance-secondary" data-close-finance-modal>取消</button><button class="finance-primary" type="submit">创建目标</button></div>
+  function openGoalModal(goalId) {
+    const existing = goalById(goalId);
+    const modal = createModal(existing ? "编辑鹅鸭鸡目标" : "新建鹅鸭鸡目标", `<form class="finance-form">
+      <label class="is-wide"><span>目标名称</span><input name="name" value="${escapeAttribute(existing?.name || "")}" required placeholder="例如：装修鸭"></label>
+      <label><span>类型</span><select name="kind">${optionList([["GOOSE","鹅 · 长期积累"],["DUCK","鸭 · 中期目标"],["CHICKEN","鸡 · 短期愿望"]], existing?.kind || "DUCK")}</select></label>
+      <label><span>目标金额（元）</span><input name="target" type="number" min="1" step="0.01" value="${existing ? (existing.targetAmountCents / 100).toFixed(2) : ""}" required></label>
+      <label><span>预计完成日期</span><input name="targetDate" type="date" value="${escapeAttribute(existing?.targetDate || "")}"></label>
+      <label><span>状态</span><select name="status">${optionList([["ACTIVE","进行中"],["SAVING","存钱中"],["GROWN","已长成"],["USED","已使用"],["COMPLETED","已完成"],["CLOSED","已关闭"]], existing?.status || "ACTIVE")}</select></label>
+      <fieldset class="finance-account-links is-wide"><legend>关联真实账户（可多选）</legend>${state.accounts.filter((item) => !item.isArchived && item.type !== "CREDIT_CARD").map((account) => `<label><input type="checkbox" name="linkedAccountIds" value="${escapeAttribute(account.id)}" ${existing?.linkedAccountIds?.includes(account.id) ? "checked" : ""}> ${escapeHtml(account.name)}</label>`).join("")}</fieldset>
+      <label class="is-wide"><span>投资摘要联动</span><select name="linkedInvestment"><option value="false">不关联投资账户</option><option value="true" ${existing?.linkedInvestmentAccountIds?.length ? "selected" : ""}>关联现有投资账户摘要</option></select></label>
+      <label class="is-wide"><span>说明</span><input name="note" value="${escapeAttribute(existing?.note || "")}" placeholder="目标用途或计划"></label>
+      <div class="finance-form-actions"><button type="button" class="finance-secondary" data-close-finance-modal>取消</button><button class="finance-primary" type="submit">保存目标</button></div>
     </form>`);
     modal.querySelector("form").addEventListener("submit", (event) => {
       event.preventDefault();
       const values = new FormData(event.currentTarget);
       const kind = String(values.get("kind"));
-      const status = kind === "CHICKEN" ? "SAVING" : "ACTIVE";
-      state.goals.push(goalSeed(uid("goal"), kind, String(values.get("name")).trim(), Math.round(Number(values.get("target")) * 100), 0, String(values.get("note") || ""), status));
-      closeModal(modal); saveNow(); renderDreams(); showToast("目标已创建");
+      const linkedAccountIds = values.getAll("linkedAccountIds").map(String);
+      if (existing) {
+        existing.name = String(values.get("name")).trim(); existing.kind = kind; existing.targetAmountCents = Math.round(Number(values.get("target")) * 100); existing.targetDate = String(values.get("targetDate") || ""); existing.status = String(values.get("status")); existing.linkedAccountIds = linkedAccountIds; existing.linkedInvestmentAccountIds = String(values.get("linkedInvestment")) === "true" ? ["*"] : []; existing.note = String(values.get("note") || ""); existing.updatedAt = new Date().toISOString();
+        const animal = state.dreamAnimals.find((item) => item.id === existing.animalId); if (animal) { animal.name = existing.name; animal.kind = kind; animal.updatedAt = new Date().toISOString(); }
+      } else {
+        const animalId = uid("animal"); const name = String(values.get("name")).trim(); state.dreamAnimals.push(animalSeed(animalId, kind, name, name));
+        state.goals.push(goalSeed(uid("goal"), animalId, kind, name, Math.round(Number(values.get("target")) * 100), 0, String(values.get("note") || ""), String(values.get("status")), String(values.get("linkedInvestment")) === "true", linkedAccountIds));
+        state.goals[state.goals.length - 1].targetDate = String(values.get("targetDate") || "");
+      }
+      closeModal(modal); saveNow(); renderDreams(); showToast(existing ? "目标已更新" : "目标已创建");
     });
+  }
+
+  function openGoalHistory(goalId) {
+    const goal = goalById(goalId); if (!goal) return;
+    const entries = state.goalEntries.filter((item) => item.goalId === goalId).sort((a, b) => String(b.occurredAt).localeCompare(String(a.occurredAt)));
+    createModal(`${goal.name} · 资金变化历史`, entries.length ? `<div class="finance-history-list">${entries.map((item) => `<div><span>${escapeHtml(formatDateTime(item.occurredAt))} · ${item.type === "SPEND" ? "目标支出" : "转入目标"}</span><strong class="${item.amountCents >= 0 ? "finance-positive" : "finance-negative"}">${signedMoney(item.amountCents)}</strong><small>${escapeHtml(state.transactions.find((transaction) => transaction.id === item.transactionId)?.note || "--")}</small></div>`).join("")}</div>` : empty("还没有目标资金变化。"));
   }
 
   function createModal(title, body) {
@@ -530,14 +631,14 @@
   function summaryCard(label, value, className) { return `<div class="finance-summary-card"><span>${escapeHtml(label)}</span><strong class="${className || ""}">${escapeHtml(value)}</strong></div>`; }
   function empty(text) { return `<div class="finance-empty">${escapeHtml(text)}</div>`; }
 
-  function accountRow(account, flow) {
+  function accountRow(account, flow, manageable) {
     const owner = memberName(account.ownerMemberId);
     const currentFlow = flow || { incoming: 0, outgoing: 0 };
     return `<div class="finance-account-row">
       <div class="finance-account-name"><span class="finance-account-type">${escapeHtml(accountIcon(account.type))}</span><div><span>${escapeHtml(accountTypeName(account.type))}</span><strong>${escapeHtml(account.name)}</strong></div></div>
       <div><span>当前余额</span><strong>${money(account.currentBalanceCents)}</strong></div>
       <div><span>本月流入 / 流出</span><strong>${money(currentFlow.incoming)} / ${money(currentFlow.outgoing)}</strong></div>
-      <div><span>所属成员 · 更新</span><strong>${escapeHtml(owner)} · ${shortDate(account.updatedAt)}</strong></div>
+      <div><span>${account.includeInFamilyAssets ? "计入家庭资产" : "不计家庭资产"} · ${escapeHtml(owner)}</span><strong>${shortDate(account.updatedAt)} ${manageable ? `<button class="finance-row-action" data-edit-account="${escapeAttribute(account.id)}">编辑</button><button class="finance-row-action" data-adjust-account="${escapeAttribute(account.id)}">调余额</button>` : ""}</strong></div>
     </div>`;
   }
 
@@ -560,11 +661,13 @@
     const emoji = goal.kind === "GOOSE" ? "🪿" : goal.kind === "DUCK" ? "🦆" : "🐔";
     const size = 25 + Math.min(18, ratio / 5);
     const remaining = Math.max(0, goal.targetAmountCents - goal.currentAmountCents);
+    const monthAdded = sum(state.goalEntries.filter((item) => item.goalId === goal.id && item.type === "ALLOCATION" && monthKey(item.occurredAt) === ledgerMonth).map((item) => item.amountCents));
+    const linkedNames = goal.linkedInvestmentAccountIds?.length ? "投资账户摘要" : (goal.linkedAccountIds || []).map(accountName).join("、") || "未关联";
     return `<article class="finance-goal-card">
       <div class="finance-goal-top"><div class="finance-animal"><div class="finance-animal-figure" style="--animal-size:${size}px">${emoji}</div><div><h3>${escapeHtml(goal.name)}</h3><p>${escapeHtml(goal.note || animalName(goal.kind))}</p></div></div><div class="finance-goal-value"><strong>${money(goal.currentAmountCents)}</strong><span>目标 ${money(goal.targetAmountCents)}</span></div></div>
       <div class="finance-progress"><i style="width:${Math.min(100, ratio)}%"></i></div>
-      <div class="finance-goal-meta"><div><span>完成比例</span><strong>${ratio.toFixed(1)}%</strong></div><div><span>累计本金</span><strong>${money(goal.principalCents)}</strong></div><div><span>累计收益</span><strong>${signedMoney(goal.earningsCents)}</strong></div><div><span>已支出</span><strong>${money(goal.spentAmountCents)}</strong></div><div><span>剩余目标</span><strong>${money(remaining)}</strong></div><div><span>状态</span><strong>${escapeHtml(goalStatusName(goal.status))}</strong></div></div>
-      <div class="finance-inline-actions"><button class="finance-primary" data-allocate-goal="${escapeAttribute(goal.id)}">转入目标</button>${goal.kind === "CHICKEN" ? `<button class="finance-secondary" data-spend-goal="${escapeAttribute(goal.id)}">目标支出</button>` : ""}</div>
+      <div class="finance-goal-meta"><div><span>完成比例</span><strong>${ratio.toFixed(1)}%</strong></div><div><span>累计本金</span><strong>${money(goal.principalCents)}</strong></div><div><span>累计收益</span><strong>${signedMoney(goal.earningsCents)}</strong></div><div><span>本月新增</span><strong>${money(monthAdded)}</strong></div><div><span>已支出</span><strong>${money(goal.spentAmountCents)}</strong></div><div><span>剩余目标</span><strong>${money(remaining)}</strong></div><div><span>预计完成</span><strong>${escapeHtml(goal.targetDate || "未设置")}</strong></div><div><span>关联账户</span><strong>${escapeHtml(linkedNames)}</strong></div><div><span>状态</span><strong>${escapeHtml(goalStatusName(goal.status))}</strong></div></div>
+      <div class="finance-inline-actions"><button class="finance-primary" data-allocate-goal="${escapeAttribute(goal.id)}">转入目标</button>${goal.kind === "CHICKEN" ? `<button class="finance-secondary" data-spend-goal="${escapeAttribute(goal.id)}">目标支出</button>` : ""}<button class="finance-secondary" data-goal-history="${escapeAttribute(goal.id)}">历史</button><button class="finance-secondary" data-edit-goal="${escapeAttribute(goal.id)}">编辑</button></div>
     </article>`;
   }
 
@@ -590,11 +693,11 @@
 
   function filteredTransactions() {
     const me = state.members.find((item) => item.isCurrentUser)?.id;
-    const partner = state.members.find((item) => !item.isCurrentUser)?.id;
+    const selectedMember = ledgerScope.startsWith("member:") ? ledgerScope.slice(7) : "";
     const needle = ledgerSearch.trim().toLowerCase();
     return [...state.transactions].filter((item) => monthKey(item.occurredAt) === ledgerMonth)
       .filter((item) => ledgerType === "ALL" || item.type === ledgerType)
-      .filter((item) => ledgerScope === "family" ? item.ownership === "FAMILY" || item.includeInFamilyStats : ledgerScope === "me" ? item.ownerMemberId === me || item.payerMemberId === me : item.ownerMemberId === partner || item.payerMemberId === partner)
+      .filter((item) => ledgerScope === "family" ? (item.ownership === "FAMILY" || item.includeInFamilyStats) && (item.isShared || item.ownerMemberId === me || item.payerMemberId === me || item.bookkeeperMemberId === me) : ledgerScope === "me" ? item.ownerMemberId === me || item.payerMemberId === me || item.bookkeeperMemberId === me : item.isShared && (item.ownerMemberId === selectedMember || item.payerMemberId === selectedMember || item.bookkeeperMemberId === selectedMember))
       .filter((item) => !needle || [categoryName(item.categoryId), accountName(item.fromAccountId), accountName(item.toAccountId), item.merchant, item.note, goalById(item.goalId)?.name].some((value) => String(value || "").toLowerCase().includes(needle)))
       .sort((a, b) => {
         const left = a[ledgerSortKey]; const right = b[ledgerSortKey];
@@ -635,7 +738,8 @@
       const marketValueCents = Math.round(sum(rows.map((holding) => Number.isFinite(Number(holding.marketValueOverride)) ? Number(holding.marketValueOverride) : (Number(holding.currentPrice) || 0) * (Number(holding.shares) || 0))) * 100);
       const profitLossCents = Math.round(sum(rows.map((holding) => Number.isFinite(Number(holding.floatingPnlOverride)) ? Number(holding.floatingPnlOverride) : ((Number(holding.currentPrice) || 0) - (Number(holding.cost) || 0)) * (Number(holding.shares) || 0) + (Number(holding.floatingPnlAdjustment) || 0))) * 100);
       const availableCashCents = Math.round((Number(account.availableCash) || 0) * 100);
-      return { id: `investment-${account.id}`, investmentAccountId: String(account.id), name: String(account.name || "投资账户"), totalAssetCents: marketValueCents + availableCashCents, marketValueCents, availableCashCents, profitLossCents, principalCents: Math.max(0, marketValueCents - profitLossCents), updatedAt: new Date().toISOString() };
+      const totalAssetCents = marketValueCents + availableCashCents;
+      return { id: `investment-${account.id}`, investmentAccountId: String(account.id), name: String(account.name || "投资账户"), totalAssetCents, marketValueCents, availableCashCents, profitLossCents, principalCents: Math.max(0, totalAssetCents - profitLossCents), updatedAt: new Date().toISOString() };
     });
   }
 
@@ -660,10 +764,22 @@
 
   function saveNow() {
     clearTimeout(saveTimer);
+    refreshDerivedState();
     state.updatedAt = new Date().toISOString();
     localStorage.setItem(CACHE_KEY, JSON.stringify(state));
     syncText = "正在保存…";
     void pushRemoteState();
+  }
+
+  function refreshDerivedState() {
+    state.investmentSummaries = investmentSummaries();
+    const accountAssets = sum(state.accounts.filter((item) => item.includeInFamilyAssets && !item.isArchived && item.type !== "CREDIT_CARD" && item.type !== "SECURITIES").map((item) => item.currentBalanceCents));
+    const liabilities = Math.abs(sum(state.accounts.filter((item) => item.type === "CREDIT_CARD" && item.currentBalanceCents < 0).map((item) => item.currentBalanceCents)));
+    const investmentAssets = sum(state.investmentSummaries.map((item) => item.totalAssetCents));
+    const today = new Date().toISOString().slice(0, 10);
+    const snapshot = { id: `family-${today}`, snapshotDate: today, scope: "FAMILY", scopeId: "family", assetCents: accountAssets + investmentAssets, liabilityCents: liabilities, netAssetCents: accountAssets + investmentAssets - liabilities, principalCents: sum(state.investmentSummaries.map((item) => item.principalCents)), profitLossCents: sum(state.investmentSummaries.map((item) => item.profitLossCents)), source: "ACCOUNT_AND_INVESTMENT_SUMMARY", createdAt: new Date().toISOString() };
+    const index = state.assetSnapshots.findIndex((item) => item.id === snapshot.id);
+    if (index >= 0) state.assetSnapshots[index] = snapshot; else state.assetSnapshots.unshift(snapshot);
   }
 
   async function loadRemoteState() {
@@ -685,6 +801,7 @@
 
   async function pushRemoteState() {
     if (location.protocol === "file:") { syncText = "本地预览 · 尚未上传"; return; }
+    refreshDerivedState();
     try {
       const response = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ state }) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -699,6 +816,8 @@
 
   function normalizeState(raw) {
     const fallback = defaultState();
+    const dreamAnimals = Array.isArray(raw.dreamAnimals) && raw.dreamAnimals.length ? raw.dreamAnimals : fallback.dreamAnimals;
+    const goals = (Array.isArray(raw.goals) && raw.goals.length ? raw.goals : fallback.goals).map((goal, index) => ({ ...goal, animalId: goal.animalId || dreamAnimals.find((animal) => animal.name === goal.name && animal.kind === goal.kind)?.id || dreamAnimals[index]?.id || "" }));
     return {
       version: 1,
       updatedAt: String(raw.updatedAt || new Date().toISOString()),
@@ -706,9 +825,11 @@
       categories: Array.isArray(raw.categories) && raw.categories.length ? raw.categories : fallback.categories,
       accounts: Array.isArray(raw.accounts) && raw.accounts.length ? raw.accounts : fallback.accounts,
       transactions: Array.isArray(raw.transactions) ? raw.transactions : [],
-      goals: Array.isArray(raw.goals) && raw.goals.length ? raw.goals : fallback.goals,
+      dreamAnimals,
+      goals,
       goalEntries: Array.isArray(raw.goalEntries) ? raw.goalEntries : [],
-      assetSnapshots: Array.isArray(raw.assetSnapshots) ? raw.assetSnapshots : []
+      assetSnapshots: Array.isArray(raw.assetSnapshots) ? raw.assetSnapshots : [],
+      investmentSummaries: Array.isArray(raw.investmentSummaries) ? raw.investmentSummaries : []
     };
   }
 
@@ -744,7 +865,8 @@
         const transaction = { id: uid("import"), occurredAt: new Date(data["日期时间"] || Date.now()).toISOString(), type, amountCents, categoryId: category?.id || "", fromAccountId: from?.id || "", toAccountId: to?.id || "", bookkeeperMemberId: bookkeeper?.id || "", payerMemberId: payer?.id || "", ownership: data["个人或家庭"] === "个人" ? "PERSONAL" : "FAMILY", ownerMemberId: data["个人或家庭"] === "个人" ? payer?.id || "" : "", isShared: true, includeInFamilyStats: !["TRANSFER", "BALANCE_ADJUSTMENT"].includes(type), goalId: goal?.id || "", merchant: data["商家"] || "", note: data["备注"] || "", splitAllocations: [], importBatchId: file.name, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
         if (type === "EXPENSE" && !transaction.fromAccountId) throw new Error("missing account");
         if (["INCOME","REFUND","REIMBURSEMENT","BALANCE_ADJUSTMENT"].includes(type) && !transaction.toAccountId) throw new Error("missing account");
-        if (type === "TRANSFER" && (!transaction.fromAccountId || (!transaction.toAccountId && !transaction.goalId))) throw new Error("missing transfer side");
+        if (type === "TRANSFER" && (!transaction.fromAccountId || !transaction.toAccountId || transaction.fromAccountId === transaction.toAccountId)) throw new Error("missing transfer side");
+        if (type === "TRANSFER" && goal && !goal.linkedAccountIds?.includes(transaction.toAccountId)) throw new Error("unlinked goal account");
         applyTransaction(transaction); imported += 1;
       } catch (_) { skipped += 1; }
     });
@@ -812,4 +934,17 @@
   function goalStatusName(status) { return ({ ACTIVE: "进行中", SAVING: "存钱中", GROWN: "已长成", USED: "已使用", COMPLETED: "已完成", CLOSED: "已关闭" })[status] || status; }
   function accountTypeName(type) { return ({ BANK: "银行卡", WECHAT: "微信", ALIPAY: "支付宝", CASH: "现金", CREDIT_CARD: "信用卡", FAMILY_SHARED: "家庭公共账户", FUND: "基金账户", SECURITIES: "证券账户", OTHER: "其他账户" })[type] || "账户"; }
   function accountIcon(type) { return ({ BANK: "卡", WECHAT: "微", ALIPAY: "支", CASH: "现", CREDIT_CARD: "信", FAMILY_SHARED: "家", FUND: "基", SECURITIES: "证", OTHER: "账" })[type] || "账"; }
+
+  if (window.__FINANCE_TEST_MODE__) {
+    window.__FINANCE_TEST_API__ = {
+      defaultState,
+      setState(nextState) { state = normalizeState(nextState); },
+      getState() { return state; },
+      applyTransaction,
+      monthlySummary,
+      investmentSummaries,
+      effectiveGoals,
+      refreshDerivedState
+    };
+  }
 })();

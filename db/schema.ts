@@ -47,6 +47,13 @@ export const financeSchemaStatements = [
   `CREATE INDEX IF NOT EXISTS finance_transactions_date_idx ON finance_transactions(occurred_at DESC)`,
   `CREATE INDEX IF NOT EXISTS finance_transactions_accounts_idx ON finance_transactions(from_account_id, to_account_id)`,
   `CREATE INDEX IF NOT EXISTS finance_transactions_goal_idx ON finance_transactions(goal_id)`,
+  `CREATE TABLE IF NOT EXISTS finance_dream_animals (
+    id TEXT PRIMARY KEY NOT NULL,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    owner_member_id TEXT,
+    body TEXT NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS finance_goals (
     id TEXT PRIMARY KEY NOT NULL,
     kind TEXT NOT NULL,
@@ -75,9 +82,17 @@ export const financeSchemaStatements = [
     body TEXT NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS finance_asset_snapshots_date_idx ON finance_asset_snapshots(snapshot_date DESC)`,
+  `CREATE TABLE IF NOT EXISTS finance_investment_summaries (
+    id TEXT PRIMARY KEY NOT NULL,
+    investment_account_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    total_asset_cents INTEGER NOT NULL DEFAULT 0,
+    profit_loss_cents INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    body TEXT NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS finance_meta (
     id TEXT PRIMARY KEY NOT NULL,
     value TEXT NOT NULL
   )`
 ] as const;
-

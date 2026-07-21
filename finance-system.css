@@ -203,6 +203,17 @@ body.finance-mode #finance-system-view {
 .finance-account-row strong,
 .finance-investment-row strong { display: block; margin-top: 4px; }
 
+.finance-row-action {
+  margin-left: 7px;
+  padding: 2px 6px;
+  border: 1px solid var(--finance-line);
+  border-radius: 5px;
+  color: var(--finance-blue);
+  background: #fff;
+  font-size: 11px;
+  cursor: pointer;
+}
+
 .finance-account-type {
   display: inline-flex;
   width: 34px;
@@ -448,6 +459,24 @@ body.finance-mode #finance-system-view {
   gap: 10px;
   padding-top: 4px;
 }
+
+.finance-account-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #dfe3e9;
+  border-radius: 8px;
+}
+
+.finance-account-links legend { padding: 0 6px; color: #606979; font-size: 12px; }
+.finance-account-links label { display: flex; grid-auto-flow: column; justify-content: start; align-items: center; gap: 7px; }
+.finance-account-links input { width: auto; min-height: 0; }
+
+.finance-history-list { display: grid; padding: 6px 18px 18px; }
+.finance-history-list > div { display: grid; grid-template-columns: 1fr auto; gap: 5px 16px; padding: 13px 0; border-bottom: 1px solid var(--finance-line); }
+.finance-history-list small { grid-column: 1 / -1; color: var(--finance-muted); }
 
 .finance-toast {
   position: fixed;

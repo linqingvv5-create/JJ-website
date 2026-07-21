@@ -15,11 +15,13 @@ const FINANCE_SCHEMA = [
   `CREATE INDEX IF NOT EXISTS finance_transactions_date_idx ON finance_transactions(occurred_at DESC)`,
   `CREATE INDEX IF NOT EXISTS finance_transactions_accounts_idx ON finance_transactions(from_account_id, to_account_id)`,
   `CREATE INDEX IF NOT EXISTS finance_transactions_goal_idx ON finance_transactions(goal_id)`,
+  `CREATE TABLE IF NOT EXISTS finance_dream_animals (id TEXT PRIMARY KEY NOT NULL, kind TEXT NOT NULL, name TEXT NOT NULL, owner_member_id TEXT, body TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS finance_goals (id TEXT PRIMARY KEY NOT NULL, kind TEXT NOT NULL, name TEXT NOT NULL, target_amount_cents INTEGER NOT NULL DEFAULT 0, allocated_amount_cents INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL, updated_at TEXT NOT NULL, body TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS finance_goal_entries (id TEXT PRIMARY KEY NOT NULL, goal_id TEXT NOT NULL, type TEXT NOT NULL, amount_cents INTEGER NOT NULL, occurred_at TEXT NOT NULL, body TEXT NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS finance_goal_entries_goal_idx ON finance_goal_entries(goal_id, occurred_at DESC)`,
   `CREATE TABLE IF NOT EXISTS finance_asset_snapshots (id TEXT PRIMARY KEY NOT NULL, snapshot_date TEXT NOT NULL, scope TEXT NOT NULL, scope_id TEXT, net_asset_cents INTEGER NOT NULL DEFAULT 0, body TEXT NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS finance_asset_snapshots_date_idx ON finance_asset_snapshots(snapshot_date DESC)`,
+  `CREATE TABLE IF NOT EXISTS finance_investment_summaries (id TEXT PRIMARY KEY NOT NULL, investment_account_id TEXT NOT NULL, name TEXT NOT NULL, total_asset_cents INTEGER NOT NULL DEFAULT 0, profit_loss_cents INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, body TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS finance_meta (id TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)`
 ];
 
@@ -88,17 +90,19 @@ function parseBodies(result) {
 
 async function readFinanceState(db) {
   await ensureFinanceSchema(db);
-  const [members, accounts, categories, transactions, goals, goalEntries, snapshots, updated] = await db.batch([
+  const [members, accounts, categories, transactions, animals, goals, goalEntries, snapshots, investments, updated] = await db.batch([
     db.prepare("SELECT body FROM finance_members ORDER BY is_current_user DESC, display_name"),
     db.prepare("SELECT body FROM finance_accounts ORDER BY name"),
     db.prepare("SELECT body FROM finance_categories ORDER BY direction, name"),
     db.prepare("SELECT body FROM finance_transactions ORDER BY occurred_at DESC"),
+    db.prepare("SELECT body FROM finance_dream_animals ORDER BY kind, name"),
     db.prepare("SELECT body FROM finance_goals ORDER BY kind, name"),
     db.prepare("SELECT body FROM finance_goal_entries ORDER BY occurred_at DESC"),
     db.prepare("SELECT body FROM finance_asset_snapshots ORDER BY snapshot_date DESC"),
+    db.prepare("SELECT body FROM finance_investment_summaries ORDER BY name"),
     db.prepare("SELECT value FROM finance_meta WHERE id = 'updated-at'")
   ]);
-  return { state: { version: 1, updatedAt: updated?.results?.[0]?.value || null, members: parseBodies(members), accounts: parseBodies(accounts), categories: parseBodies(categories), transactions: parseBodies(transactions), goals: parseBodies(goals), goalEntries: parseBodies(goalEntries), assetSnapshots: parseBodies(snapshots) } };
+  return { state: { version: 1, updatedAt: updated?.results?.[0]?.value || null, members: parseBodies(members), accounts: parseBodies(accounts), categories: parseBodies(categories), transactions: parseBodies(transactions), dreamAnimals: parseBodies(animals), goals: parseBodies(goals), goalEntries: parseBodies(goalEntries), assetSnapshots: parseBodies(snapshots), investmentSummaries: parseBodies(investments) } };
 }
 
 function requireArray(state, key) {
@@ -118,15 +122,17 @@ async function writeFinanceState(request, db) {
   const accounts = requireArray(state, "accounts");
   const categories = requireArray(state, "categories");
   const transactions = requireArray(state, "transactions");
+  const animals = requireArray(state, "dreamAnimals");
   const goals = requireArray(state, "goals");
   const goalEntries = Array.isArray(state.goalEntries) ? state.goalEntries : [];
   const snapshots = Array.isArray(state.assetSnapshots) ? state.assetSnapshots : [];
+  const investments = Array.isArray(state.investmentSummaries) ? state.investmentSummaries : [];
   await ensureFinanceSchema(db);
   const statements = [
     db.prepare("DELETE FROM finance_members"), db.prepare("DELETE FROM finance_accounts"),
     db.prepare("DELETE FROM finance_categories"), db.prepare("DELETE FROM finance_transactions"),
-    db.prepare("DELETE FROM finance_goals"), db.prepare("DELETE FROM finance_goal_entries"),
-    db.prepare("DELETE FROM finance_asset_snapshots")
+    db.prepare("DELETE FROM finance_dream_animals"), db.prepare("DELETE FROM finance_goals"), db.prepare("DELETE FROM finance_goal_entries"),
+    db.prepare("DELETE FROM finance_asset_snapshots"), db.prepare("DELETE FROM finance_investment_summaries")
   ];
   members.forEach((item) => statements.push(db.prepare("INSERT INTO finance_members (id, display_name, role, is_current_user, is_active, body) VALUES (?1, ?2, ?3, ?4, ?5, ?6)").bind(safeText(item.id), safeText(item.displayName), safeText(item.role), item.isCurrentUser ? 1 : 0, item.isActive === false ? 0 : 1, JSON.stringify(item))));
   accounts.forEach((item) => statements.push(db.prepare("INSERT INTO finance_accounts (id, name, type, owner_member_id, current_balance_cents, include_in_family_assets, updated_at, body) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)").bind(safeText(item.id), safeText(item.name), safeText(item.type), safeText(item.ownerMemberId), Math.trunc(Number(item.currentBalanceCents) || 0), item.includeInFamilyAssets ? 1 : 0, safeText(item.updatedAt, new Date().toISOString()), JSON.stringify(item))));
@@ -134,11 +140,20 @@ async function writeFinanceState(request, db) {
   transactions.forEach((item) => {
     const amount = Math.trunc(Number(item.amountCents) || 0);
     if (amount <= 0) throw new Error(`Invalid transaction amount: ${safeText(item.id)}`);
+    const type = safeText(item.type);
+    if (!["INCOME", "EXPENSE", "TRANSFER", "REFUND", "REIMBURSEMENT", "BALANCE_ADJUSTMENT"].includes(type)) throw new Error(`Invalid finance transaction type: ${type}`);
+    if (type === "TRANSFER" && (!safeText(item.fromAccountId) || !safeText(item.toAccountId) || safeText(item.fromAccountId) === safeText(item.toAccountId))) throw new Error("Transfers require two different accounts");
+    if (type === "TRANSFER" && item.includeInFamilyStats) throw new Error("Transfers cannot be included in income or expense statistics");
+    if (type === "EXPENSE" && !safeText(item.fromAccountId)) throw new Error("Expenses require a payment account");
+    if (["INCOME", "REFUND", "REIMBURSEMENT"].includes(type) && !safeText(item.toAccountId)) throw new Error(`${type} requires a receiving account`);
+    if (type === "BALANCE_ADJUSTMENT" && item.includeInFamilyStats) throw new Error("Balance adjustments cannot be included in income or expense statistics");
     statements.push(db.prepare("INSERT INTO finance_transactions (id, occurred_at, type, amount_cents, category_id, from_account_id, to_account_id, bookkeeper_member_id, payer_member_id, ownership, include_in_family_stats, goal_id, body) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)").bind(safeText(item.id), safeText(item.occurredAt), safeText(item.type), amount, safeText(item.categoryId), safeText(item.fromAccountId), safeText(item.toAccountId), safeText(item.bookkeeperMemberId), safeText(item.payerMemberId), safeText(item.ownership, "FAMILY"), item.includeInFamilyStats ? 1 : 0, safeText(item.goalId), JSON.stringify(item)));
   });
+  animals.forEach((item) => statements.push(db.prepare("INSERT INTO finance_dream_animals (id, kind, name, owner_member_id, body) VALUES (?1, ?2, ?3, ?4, ?5)").bind(safeText(item.id), safeText(item.kind), safeText(item.name), safeText(item.ownerMemberId), JSON.stringify(item))));
   goals.forEach((item) => statements.push(db.prepare("INSERT INTO finance_goals (id, kind, name, target_amount_cents, allocated_amount_cents, status, updated_at, body) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)").bind(safeText(item.id), safeText(item.kind), safeText(item.name), Math.trunc(Number(item.targetAmountCents) || 0), Math.trunc(Number(item.allocatedAmountCents) || 0), safeText(item.status), safeText(item.updatedAt, new Date().toISOString()), JSON.stringify(item))));
   goalEntries.forEach((item) => statements.push(db.prepare("INSERT INTO finance_goal_entries (id, goal_id, type, amount_cents, occurred_at, body) VALUES (?1, ?2, ?3, ?4, ?5, ?6)").bind(safeText(item.id), safeText(item.goalId), safeText(item.type), Math.trunc(Number(item.amountCents) || 0), safeText(item.occurredAt), JSON.stringify(item))));
   snapshots.forEach((item) => statements.push(db.prepare("INSERT INTO finance_asset_snapshots (id, snapshot_date, scope, scope_id, net_asset_cents, body) VALUES (?1, ?2, ?3, ?4, ?5, ?6)").bind(safeText(item.id), safeText(item.snapshotDate), safeText(item.scope), safeText(item.scopeId), Math.trunc(Number(item.netAssetCents) || 0), JSON.stringify(item))));
+  investments.forEach((item) => statements.push(db.prepare("INSERT INTO finance_investment_summaries (id, investment_account_id, name, total_asset_cents, profit_loss_cents, updated_at, body) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)").bind(safeText(item.id), safeText(item.investmentAccountId), safeText(item.name), Math.trunc(Number(item.totalAssetCents) || 0), Math.trunc(Number(item.profitLossCents) || 0), safeText(item.updatedAt, new Date().toISOString()), JSON.stringify(item))));
   const updatedAt = new Date().toISOString();
   statements.push(db.prepare("INSERT INTO finance_meta (id, value) VALUES ('updated-at', ?1) ON CONFLICT(id) DO UPDATE SET value = excluded.value").bind(updatedAt));
   await db.batch(statements);
