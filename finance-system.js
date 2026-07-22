@@ -256,7 +256,7 @@
           </div>
         </section>
         <section class="finance-panel overview-income-panel"><div class="overview-section-title"><strong>本月收入</strong></div>${incomeDistributionTable(cockpit.incomeDistribution)}</section>
-        <section class="finance-panel overview-spending-panel"><div class="overview-section-title"><strong>本月支出</strong></div>${monthlySpendingGrid(cockpit.monthlySpending)}</section>
+        <section class="finance-panel overview-spending-panel">${monthlySpendingGrid(cockpit.monthlySpending)}</section>
         <section class="finance-panel overview-destination-panel"><div class="overview-section-title"><strong>本月资金去向</strong></div><div class="overview-destination-grid">${cockpitMetric("固定开支", cockpit.allocations.fixed)}${cockpitMetric("生活开支", cockpit.allocations.living)}${cockpitMetric("机动开支", cockpit.allocations.flex)}${cockpitMetric("Dream基金", cockpit.allocations.dream)}${cockpitMetric("投资账户", cockpit.allocations.investment)}${cockpitMetric("家庭公共账户", cockpit.allocations.family)}</div></section>
       </div>`;
   }
@@ -973,7 +973,7 @@
     return `<div class="overview-income-table"><div class="overview-income-head"><span>成员</span><span class="is-income">本月收入</span><span class="is-dream">划入Dream基金</span><span class="is-living">划入个人生活费</span><span class="is-family">划入家庭公共账户</span></div>${rows.map((item) => `<div class="overview-income-row"><strong class="overview-income-member">${escapeHtml(item.label)}</strong>${cells(item).map(([label, value, className]) => `<div class="${className}"><small>${escapeHtml(label)}</small><strong>${money(value)}</strong></div>`).join("")}</div>`).join("")}</div>`;
   }
   function monthlySpendingGrid(rows) {
-    return `<div class="overview-spending-grid">${rows.map((item) => `<article><strong class="overview-spending-member">${escapeHtml(item.label)}</strong><div class="is-expense"><span>本月支出</span><strong>${money(item.expense)}</strong></div><div class="is-surplus"><span>本月生活盈余</span><strong>${money(item.livingSurplus)}</strong></div><div class="is-account-surplus"><span>生活费账户总盈余</span><strong>${money(item.accountSurplus)}</strong></div></article>`).join("")}</div>`;
+    return `<div class="overview-spending-table"><div class="overview-spending-head"><span>成员</span><span>本月支出</span><span>本月生活盈余</span><span>生活费账户总盈余</span></div>${rows.map((item) => `<div class="overview-spending-row"><strong>${escapeHtml(item.label)}</strong><div class="is-expense"><strong>${money(item.expense)}</strong></div><div class="is-surplus"><strong>${money(item.livingSurplus)}</strong></div><div class="is-account-surplus"><strong>${money(item.accountSurplus)}</strong></div></div>`).join("")}</div>`;
   }
   function accountGroupTotal(accounts) { return sum(accounts.filter((item) => item.type !== "CREDIT_CARD" && item.type !== "VIRTUAL_POOL").map((item) => item.currentBalanceCents)); }
   function accountGroup(title, accounts, flows, ownerId) { return `<section class="finance-panel account-group"><div class="finance-panel-head"><div><strong>${escapeHtml(title)}</strong><br><span>${accounts.length} 个账户 · ${money(accountGroupTotal(accounts))}</span></div><button class="finance-secondary" data-member-account-detail="${escapeAttribute(ownerId || "")}">查看明细</button></div><div class="finance-account-list">${accounts.length ? accounts.map((account) => accountRow(account, flows[account.id], true)).join("") : empty("暂未添加账户")}</div></section>`; }

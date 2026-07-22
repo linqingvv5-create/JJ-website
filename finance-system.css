@@ -242,6 +242,7 @@ body.finance-mode #finance-system-view {
 }
 .overview-income-head {
   color: var(--finance-muted);
+  background: #fafbfc;
   font-size: 11px;
   font-weight: 700;
 }
@@ -258,16 +259,10 @@ body.finance-mode #finance-system-view {
   text-align: center;
   overflow-wrap: anywhere;
 }
-.overview-income-head span:first-child,
-.overview-income-member { background: #fafbfc; }
-.overview-income-head .is-income,
-.overview-income-row .is-income { background: #fff1f1; }
-.overview-income-head .is-dream,
-.overview-income-row .is-dream { background: #eef6ff; }
-.overview-income-head .is-living,
-.overview-income-row .is-living,
-.overview-income-head .is-family,
-.overview-income-row .is-family { background: #eefaf3; }
+.overview-income-row .is-income strong { color: #d84c4c; }
+.overview-income-row .is-dream strong { color: #367fc1; }
+.overview-income-row .is-living strong,
+.overview-income-row .is-family strong { color: #27845b; }
 .overview-income-row { border-top: 1px solid var(--finance-line); }
 .overview-income-row:first-of-type { border-top: 0; }
 .overview-income-row small { display: none; }
@@ -284,35 +279,36 @@ body.finance-mode #finance-system-view {
 .overview-destination-grid .cockpit-metric { padding: 11px 12px; background: #fff; }
 .overview-destination-grid .cockpit-metric strong { font-size: 14px; }
 
-.overview-spending-grid {
+.overview-spending-head,
+.overview-spending-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(66px, .65fr) repeat(3, minmax(0, 1fr));
+  align-items: stretch;
 }
-.overview-spending-grid article { min-width: 0; border-left: 1px solid var(--finance-line); }
-.overview-spending-grid article:first-child { border-left: 0; }
-.overview-spending-member {
-  display: block;
-  padding: 10px 12px;
-  text-align: center;
+.overview-spending-head {
+  color: var(--finance-muted);
   background: #fafbfc;
-  border-bottom: 1px solid var(--finance-line);
+  font-size: 11px;
+  font-weight: 700;
 }
-.overview-spending-grid article > div {
+.overview-spending-head span,
+.overview-spending-row > strong,
+.overview-spending-row > div {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: center;
+  min-width: 0;
   min-height: 48px;
-  padding: 9px 12px;
+  padding: 8px 7px;
   box-sizing: border-box;
-  border-top: 1px solid rgba(226, 231, 236, .75);
+  text-align: center;
+  overflow-wrap: anywhere;
 }
-.overview-spending-grid article > div:first-of-type { border-top: 0; }
-.overview-spending-grid article > .is-expense { background: #eefaf3; }
-.overview-spending-grid article > .is-surplus,
-.overview-spending-grid article > .is-account-surplus { background: #fff1f1; }
-.overview-spending-grid span { color: var(--finance-muted); font-size: 11px; }
-.overview-spending-grid article > div strong { font-size: 14px; white-space: nowrap; }
+.overview-spending-row { border-top: 1px solid var(--finance-line); }
+.overview-spending-row > div strong { font-size: clamp(11px, 1.4vw, 14px); white-space: nowrap; }
+.overview-spending-row .is-expense strong { color: #27845b; }
+.overview-spending-row .is-surplus strong,
+.overview-spending-row .is-account-surplus strong { color: #d84c4c; }
 
 .account-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0 16px 12px; }
 .account-groups { display: grid; gap: 12px; padding: 0 16px 16px; }
@@ -373,10 +369,10 @@ body.finance-mode #finance-system-view {
   .overview-income-row > strong,
   .overview-income-row > div { min-height: 44px; padding: 6px 3px; font-size: 9px; line-height: 1.25; }
   .overview-income-row > div strong { font-size: 10px; }
-  .overview-spending-member { padding: 8px 4px; }
-  .overview-spending-grid article > div { align-items: flex-start; min-height: 66px; padding: 7px 5px; flex-direction: column; justify-content: center; }
-  .overview-spending-grid span { font-size: 9px; line-height: 1.25; }
-  .overview-spending-grid article > div strong { font-size: 11px; }
+  .overview-spending-head span,
+  .overview-spending-row > strong,
+  .overview-spending-row > div { min-height: 44px; padding: 6px 3px; font-size: 9px; line-height: 1.25; }
+  .overview-spending-row > div strong { font-size: 10px; }
   .overview-destination-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .overview-destination-grid .cockpit-metric { border-top: 1px solid var(--finance-line); border-left: 0; }
   .overview-destination-grid .cockpit-metric:nth-child(even) { border-left: 1px solid var(--finance-line); }
