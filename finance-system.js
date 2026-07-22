@@ -143,6 +143,7 @@
     document.querySelectorAll("[data-primary-section]").forEach((button) => {
       button.addEventListener("click", () => openPrimarySection(button.dataset.primarySection));
     });
+    document.querySelector("[data-stock-board-entry]")?.addEventListener("click", () => openInvestmentTab("holdings"));
     els.moduleTabs?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-module-tab]");
       if (!button) return;

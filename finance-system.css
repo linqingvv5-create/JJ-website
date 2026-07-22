@@ -30,6 +30,33 @@ body.finance-mode #finance-system-view {
   padding-bottom: 28px;
 }
 
+.finance-topbar-actions {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top));
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.finance-topbar-actions .topbar-reset,
+.finance-stock-entry {
+  position: static;
+  padding: 8px 2px;
+  border: 0;
+  color: #fff;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.finance-stock-entry {
+  padding-right: 9px;
+  border-right: 1px solid rgba(255,255,255,.45);
+  font-weight: 700;
+}
+
 .finance-main-nav {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }

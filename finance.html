@@ -12,7 +12,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>林青资金与投资管理系统</title>
   <link rel="stylesheet" href="style.css?v=20260717-28">
-  <link rel="stylesheet" href="finance-system.css?v=20260722-4">
+  <link rel="stylesheet" href="finance-system.css?v=20260722-5">
   <link rel="stylesheet" href="supabase-auth.css?v=20260722-1">
 </head>
 <body class="auth-pending">
@@ -31,7 +31,10 @@
         <p class="sync-status sync-status-checking" id="sync-status">检查同步...</p>
       </div>
 
-      <button id="reset-data-btn" class="topbar-reset" type="button">重置</button>
+      <div class="finance-topbar-actions">
+        <button class="finance-stock-entry" type="button" data-stock-board-entry>股票交易</button>
+        <button id="reset-data-btn" class="topbar-reset" type="button">重置</button>
+      </div>
     </header>
 
     <nav id="finance-module-tabs" class="finance-module-tabs" aria-label="模块页签" hidden></nav>
@@ -72,6 +75,6 @@
   <script src="supabase-auth.js?v=20260722-5"></script>
   <script src="data.js?v=20260717-28"></script>
   <script src="trade-board.js?v=20260722-2"></script>
-  <script src="finance-system.js?v=20260722-9"></script>
+  <script src="finance-system.js?v=20260722-10"></script>
 </body>
 </html>
