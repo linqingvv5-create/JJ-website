@@ -249,15 +249,14 @@
       <div class="finance-page">
         ${pageHead("家庭资金总览", "", `<input type="month" class="finance-secondary" data-dashboard-month value="${escapeAttribute(ledgerMonth)}">`)}
         <section class="overview-asset-card">
-          <div class="overview-section-title"><strong>家庭资产总览</strong></div>
           <div class="overview-asset-grid">
-            ${overviewAssetBlock("家庭", cockpit.familyAssets, true)}
+            ${overviewAssetBlock("家庭", cockpit.familyAssets)}
             ${overviewAssetBlock("白白", cockpit.baibaiAssets)}
             ${overviewAssetBlock("胖胖", cockpit.pangpangAssets)}
           </div>
         </section>
-        <section class="finance-panel overview-income-panel"><div class="overview-section-title"><strong>本月收入分配</strong></div>${incomeDistributionTable(cockpit.incomeDistribution)}</section>
-        <section class="finance-panel overview-remaining-panel"><div class="overview-section-title"><strong>本月剩余生活费</strong></div><div class="overview-remaining-grid">${cockpitMetric("白白剩余生活费", cockpit.remaining.baibai)}${cockpitMetric("胖胖剩余生活费", cockpit.remaining.pangpang)}${cockpitMetric("家庭公共账户剩余", cockpit.remaining.family)}</div></section>
+        <section class="finance-panel overview-income-panel"><div class="overview-section-title"><strong>本月收入</strong></div>${incomeDistributionTable(cockpit.incomeDistribution)}</section>
+        <section class="finance-panel overview-spending-panel"><div class="overview-section-title"><strong>本月支出</strong></div>${monthlySpendingGrid(cockpit.monthlySpending)}</section>
         <section class="finance-panel overview-destination-panel"><div class="overview-section-title"><strong>本月资金去向</strong></div><div class="overview-destination-grid">${cockpitMetric("固定开支", cockpit.allocations.fixed)}${cockpitMetric("生活开支", cockpit.allocations.living)}${cockpitMetric("机动开支", cockpit.allocations.flex)}${cockpitMetric("Dream基金", cockpit.allocations.dream)}${cockpitMetric("投资账户", cockpit.allocations.investment)}${cockpitMetric("家庭公共账户", cockpit.allocations.family)}</div></section>
       </div>`;
   }
@@ -928,7 +927,6 @@
     const whiteDistribution = distributionFor(me?.id);
     const partnerDistribution = distributionFor(partner?.id);
     const otherDistribution = distributionFor("other");
-    const totalDistribution = [whiteDistribution, partnerDistribution, otherDistribution].reduce((result, item) => ({ income: result.income + item.income, dream: result.dream + item.dream, living: result.living + item.living, family: result.family + item.family, total: result.total + item.total }), { income: 0, dream: 0, living: 0, family: 0, total: 0 });
     const cashAccounts = state.accounts.filter((item) => !item.isArchived && item.includeInFamilyAssets && !["CREDIT_CARD", "SECURITIES", "VIRTUAL_POOL"].includes(item.type));
     const cashAssets = sum(cashAccounts.map((item) => item.currentBalanceCents));
     const investmentAssets = sum(investments.map((item) => item.totalAssetCents));
@@ -943,7 +941,9 @@
     const livingSpentFor = (ownerId) => sum(monthRows.filter((item) => item.type === "EXPENSE" && topCategoryId(item.categoryId) === "category-living" && (item.ownerMemberId || item.payerMemberId) === ownerId).map((item) => item.amountCents));
     const rule = state.allocationRules[0] || { livingBudgets: {} };
     const availableFor = (ownerId) => sum(state.accounts.filter((item) => !item.isArchived && item.ownerMemberId === ownerId && !["CREDIT_CARD", "SECURITIES", "VIRTUAL_POOL"].includes(item.type)).map((item) => item.currentBalanceCents));
-    const remainingFor = (ownerId) => Math.max(0, Number(rule.livingBudgets?.[ownerId]) || availableFor(ownerId)) - livingSpentFor(ownerId);
+    const monthlyExpenseFor = (ownerId) => sum(monthRows.filter((item) => item.type === "EXPENSE" && ownerOf(item) === ownerId).map((item) => item.amountCents));
+    const livingSurplusFor = (ownerId) => Math.max(0, Number(rule.livingBudgets?.[ownerId]) || 0) - livingSpentFor(ownerId);
+    const spendingFor = (label, ownerId) => ({ label, expense: monthlyExpenseFor(ownerId), livingSurplus: livingSurplusFor(ownerId), accountSurplus: availableFor(ownerId) });
     return {
       cashAssets, investmentAssets, totalAssets: cashAssets + investmentAssets, netAssets: cashAssets + investmentAssets - liabilities,
       familyAssets: { total: cashAssets + investmentAssets, investment: investmentAssets, cash: cashAssets, dream: dreamShort + dreamLong, dreamLong, dreamShort },
@@ -951,9 +951,9 @@
       pangpangAssets: { total: partnerCash + partnerInvestment, investment: partnerInvestment, cash: partnerCash },
       dreamShort, dreamLong, dreamTotal: dreamShort + dreamLong,
       baibaiIncome, pangpangIncome, otherIncome: Math.max(0, monthIncome - baibaiIncome - pangpangIncome), monthIncome,
-      incomeDistribution: [{ label: "白白", ...whiteDistribution }, { label: "胖胖", ...partnerDistribution }, { label: "其他收入", ...otherDistribution }, { label: "合计", ...totalDistribution, isTotal: true }],
+      incomeDistribution: [{ label: "白白", ...whiteDistribution }, { label: "胖胖", ...partnerDistribution }, { label: "其他收入", ...otherDistribution }],
       allocations: { fixed: allocation("category-fixed"), living: allocation("category-living"), flex: allocation("category-flex"), dream: allocation("category-dream"), investment: allocation("category-investment"), family: sum(familyTransfers.map((item) => item.amountCents)) },
-      remaining: { baibai: remainingFor(me?.id), pangpang: remainingFor(partner?.id), family: remainingFor("family") }
+      monthlySpending: [spendingFor("白白", me?.id), spendingFor("胖胖", partner?.id), spendingFor("家庭", "family")]
     };
   }
 
@@ -964,14 +964,16 @@
 
   function cockpitMetric(label, value) { return `<div class="cockpit-metric"><span>${escapeHtml(label)}</span><strong>${money(value)}</strong></div>`; }
   function cockpitPanel(title, rows) { return `<section class="finance-panel cockpit-panel"><div class="finance-panel-head"><strong>${escapeHtml(title)}</strong></div><div>${rows.map(([label, value, className]) => `<div class="cockpit-row ${className || ""}"><span>${escapeHtml(label)}</span><strong>${money(value)}</strong></div>`).join("")}</div></section>`; }
-  function overviewAssetBlock(label, assets, isFamily = false) {
+  function overviewAssetBlock(label, assets) {
     const rows = [[`${label}总资产`, assets.total], ["投资资产", assets.investment], ["现金资产", assets.cash]];
-    if (isFamily) rows.push(["Dream基金总额", assets.dream], ["长期Dream", assets.dreamLong], ["短期Dream", assets.dreamShort]);
-    return `<article class="overview-asset-block ${isFamily ? "is-family" : ""}"><div class="overview-asset-block-head"><span>${escapeHtml(label)}</span><strong>${money(assets.total)}</strong></div><div class="overview-asset-breakdown">${rows.slice(1).map(([name, value]) => `<div><span>${escapeHtml(name)}</span><strong>${money(value)}</strong></div>`).join("")}</div></article>`;
+    return `<article class="overview-asset-block ${label === "家庭" ? "is-family" : ""}"><div class="overview-asset-block-head"><span>${escapeHtml(label)}</span><strong>${money(assets.total)}</strong></div><div class="overview-asset-breakdown">${rows.slice(1).map(([name, value]) => `<div><span>${escapeHtml(name)}</span><strong>${money(value)}</strong></div>`).join("")}</div></article>`;
   }
   function incomeDistributionTable(rows) {
-    const cells = (item) => [["本月收入", item.income], ["划入Dream基金", item.dream], ["划入个人生活费", item.living], ["划入家庭公共账户", item.family], ["合计", item.total]];
-    return `<div class="overview-income-table"><div class="overview-income-head"><span>成员</span><span>本月收入</span><span>划入Dream基金</span><span>划入个人生活费</span><span>划入家庭公共账户</span><span>合计</span></div>${rows.map((item) => `<div class="overview-income-row ${item.isTotal ? "is-total" : ""}"><strong class="overview-income-member">${escapeHtml(item.label)}</strong>${cells(item).map(([label, value]) => `<div><small>${escapeHtml(label)}</small><strong>${money(value)}</strong></div>`).join("")}</div>`).join("")}</div>`;
+    const cells = (item) => [["本月收入", item.income, "is-income"], ["划入Dream基金", item.dream, "is-dream"], ["划入个人生活费", item.living, "is-living"], ["划入家庭公共账户", item.family, "is-family"]];
+    return `<div class="overview-income-table"><div class="overview-income-head"><span>成员</span><span class="is-income">本月收入</span><span class="is-dream">划入Dream基金</span><span class="is-living">划入个人生活费</span><span class="is-family">划入家庭公共账户</span></div>${rows.map((item) => `<div class="overview-income-row"><strong class="overview-income-member">${escapeHtml(item.label)}</strong>${cells(item).map(([label, value, className]) => `<div class="${className}"><small>${escapeHtml(label)}</small><strong>${money(value)}</strong></div>`).join("")}</div>`).join("")}</div>`;
+  }
+  function monthlySpendingGrid(rows) {
+    return `<div class="overview-spending-grid">${rows.map((item) => `<article><strong class="overview-spending-member">${escapeHtml(item.label)}</strong><div class="is-expense"><span>本月支出</span><strong>${money(item.expense)}</strong></div><div class="is-surplus"><span>本月生活盈余</span><strong>${money(item.livingSurplus)}</strong></div><div class="is-account-surplus"><span>生活费账户总盈余</span><strong>${money(item.accountSurplus)}</strong></div></article>`).join("")}</div>`;
   }
   function accountGroupTotal(accounts) { return sum(accounts.filter((item) => item.type !== "CREDIT_CARD" && item.type !== "VIRTUAL_POOL").map((item) => item.currentBalanceCents)); }
   function accountGroup(title, accounts, flows, ownerId) { return `<section class="finance-panel account-group"><div class="finance-panel-head"><div><strong>${escapeHtml(title)}</strong><br><span>${accounts.length} 个账户 · ${money(accountGroupTotal(accounts))}</span></div><button class="finance-secondary" data-member-account-detail="${escapeAttribute(ownerId || "")}">查看明细</button></div><div class="finance-account-list">${accounts.length ? accounts.map((account) => accountRow(account, flows[account.id], true)).join("") : empty("暂未添加账户")}</div></section>`; }
