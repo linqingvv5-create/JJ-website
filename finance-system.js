@@ -349,8 +349,8 @@
           <button type="button" data-open-view="ledger"><span>我的账本</span><b>查看个人与家庭明细 ›</b></button>
           <button type="button" data-open-view="accounts"><span>我的账户</span><b>余额与本月资金流 ›</b></button>
           <button type="button" data-open-view="members"><span>家庭成员</span><b>成员与共享账目 ›</b></button>
-          ${window.FinanceAuth?.activeMemberId ? `<button type="button" data-change-member-password><span>修改个人密码</span><b>仅用于我的个人页 ›</b></button><button type="button" data-leave-member><span>退出个人页</span><b>返回家庭共享区域 ›</b></button>` : ""}
-          ${window.FinanceAuth?.household ? `<button type="button" data-cloud-sign-out><span>退出整个系统</span><b>重新输入总密码 ›</b></button>` : ""}
+          ${window.FinanceAuth?.activeMemberId ? `<button type="button" data-change-member-password><span>修改登录密码</span><b>下次在首页使用新密码 ›</b></button>` : ""}
+          ${window.FinanceAuth?.household ? `<button type="button" data-cloud-sign-out><span>切换用户 / 退出</span><b>返回首页登录 ›</b></button>` : ""}
         </section>
       </div>`;
   }
@@ -549,12 +549,7 @@
   }
 
   async function leaveMemberPortal() {
-    window.FinanceAuth?.leaveMember?.();
-    await loadRemoteState();
-    state.members.forEach((item) => { item.isCurrentUser = false; });
-    localStorage.setItem(cacheKey(), JSON.stringify(state));
-    openFinanceView("members");
-    showToast("已退出个人页");
+    await window.FinanceAuth?.signOut?.();
   }
 
   function activateMember(memberId) {

@@ -75,7 +75,8 @@
 
   function storeMemberSession(memberId, token) {
     localStorage.setItem(MEMBER_ID_KEY, memberId);
-    localStorage.setItem(MEMBER_TOKEN_KEY, token);
+    if (token) localStorage.setItem(MEMBER_TOKEN_KEY, token);
+    else localStorage.removeItem(MEMBER_TOKEN_KEY);
     api.activeMemberId = memberId;
   }
 
@@ -95,7 +96,11 @@
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store"
       });
-      if (response.ok) return unlock();
+      if (response.ok) {
+        const payload = await response.json();
+        if (payload.memberId) storeMemberSession(payload.memberId, "");
+        return unlock();
+      }
     } catch (_) {
       showMessage("暂时无法连接，请检查网络后重试。", true);
       return;
@@ -107,7 +112,7 @@
     gate.hidden = false;
     document.body.classList.add("auth-pending");
     card.innerHTML = `
-      <div class="auth-brand"><strong>林青资金与投资</strong><span>输入密码即可进入</span></div>
+      <div class="auth-brand"><strong>林青资金与投资</strong><span>输入你的个人密码即可进入</span></div>
       <form class="auth-form" data-auth-form>
         <label>密码<input name="password" type="password" autocomplete="current-password" required autofocus placeholder="请输入密码"></label>
         <button class="auth-primary" type="submit">进入</button>
@@ -135,6 +140,7 @@
         return;
       }
       localStorage.setItem(TOKEN_KEY, payload.token);
+      if (payload.memberId) storeMemberSession(payload.memberId, payload.memberToken || "");
       unlock();
     } catch (_) {
       showMessage("网络连接失败，请检查网络后重试。", true);
@@ -146,7 +152,7 @@
   function unlock() {
     api.user = null;
     api.household = { id: "family", name: "我的家庭" };
-    api.member = { id: "member-me", displayName: "我", role: "owner" };
+    api.member = { id: api.activeMemberId || "", displayName: "", role: "member" };
     api.members = [api.member];
     gate.hidden = true;
     document.body.classList.remove("auth-pending");

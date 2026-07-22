@@ -88,31 +88,59 @@ function bearerToken(request) {
   return authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
 }
 
-async function requireSession(request, env) {
+async function siteSession(request, env) {
   const password = String(env.APP_PASSWORD || "");
   const claims = password ? await sessionClaims(bearerToken(request), password) : null;
-  return claims?.type === "site";
+  return claims?.type === "site" ? claims : null;
+}
+
+async function requireSession(request, env) {
+  return Boolean(await siteSession(request, env));
 }
 
 async function memberSession(request, env) {
   const password = String(env.APP_PASSWORD || "");
   const token = request.headers.get("x-member-authorization") || "";
   const claims = password ? await sessionClaims(token.startsWith("Bearer ") ? token.slice(7).trim() : "", password) : null;
-  return claims?.type === "member" && claims.memberId ? String(claims.memberId) : null;
+  if (claims?.type === "member" && claims.memberId) return String(claims.memberId);
+  const site = await siteSession(request, env);
+  return site?.memberId ? String(site.memberId) : null;
 }
 
 async function sessionResponse(request, env) {
-  const password = String(env.APP_PASSWORD || "");
-  if (!password) return json({ error: "网站密码尚未设置" }, 503, request);
+  const secret = String(env.APP_PASSWORD || "");
+  if (!secret) return json({ error: "网站密码尚未设置" }, 503, request);
   if (request.method === "GET") {
-    return await requireSession(request, env) ? json({ ok: true }, 200, request) : json({ error: "Unauthorized" }, 401, request);
+    const claims = await siteSession(request, env);
+    return claims?.memberId ? json({ ok: true, memberId: String(claims.memberId) }, 200, request) : json({ error: "Unauthorized" }, 401, request);
   }
   if (request.method === "POST") {
     const payload = await request.json().catch(() => ({}));
-    if (!await passwordMatches(String(payload.password || ""), password)) return json({ error: "Unauthorized" }, 401, request);
-    return json({ ok: true, token: await createSessionToken(password, { type: "site" }) }, 200, request);
+    const loginPassword = String(payload.password || "");
+    await ensureFinanceSchema(env.DB);
+    const locks = await env.DB.prepare("SELECT member_id, password_hash, salt FROM finance_member_locks ORDER BY member_id").all();
+    for (const row of locks?.results || []) {
+      if (await memberPasswordMatches(loginPassword, row)) return memberLoginResponse(request, secret, String(row.member_id));
+    }
+    const members = await env.DB.prepare("SELECT id FROM finance_members ORDER BY is_current_user DESC, rowid ASC").all();
+    const primaryMemberId = (members?.results || []).map((row) => String(row.id)).find((id) => id === "member-me") || String(members?.results?.[0]?.id || "");
+    const primaryHasPassword = (locks?.results || []).some((row) => String(row.member_id) === primaryMemberId);
+    if (primaryMemberId && !primaryHasPassword && await passwordMatches(loginPassword, secret)) {
+      await saveMemberPassword(env.DB, primaryMemberId, loginPassword);
+      return memberLoginResponse(request, secret, primaryMemberId);
+    }
+    return json({ error: "Unauthorized" }, 401, request);
   }
   return new Response("Method Not Allowed", { status: 405, headers: { ...apiHeaders(request), allow: "GET, POST, OPTIONS" } });
+}
+
+async function memberLoginResponse(request, secret, memberId) {
+  return json({
+    ok: true,
+    memberId,
+    token: await createSessionToken(secret, { type: "site", memberId }),
+    memberToken: await createSessionToken(secret, { type: "member", memberId })
+  }, 200, request);
 }
 
 async function deriveMemberPassword(password, salt) {
@@ -124,6 +152,15 @@ async function deriveMemberPassword(password, salt) {
 async function memberPasswordMatches(password, row) {
   if (!row) return false;
   return bytesEqual(await deriveMemberPassword(password, decodeBase64Url(String(row.salt))), decodeBase64Url(String(row.password_hash)));
+}
+
+async function saveMemberPassword(db, memberId, password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await deriveMemberPassword(password, salt);
+  await db.prepare(`INSERT INTO finance_member_locks (member_id, password_hash, salt, updated_at)
+    VALUES (?1, ?2, ?3, ?4)
+    ON CONFLICT(member_id) DO UPDATE SET password_hash = excluded.password_hash, salt = excluded.salt, updated_at = excluded.updated_at`)
+    .bind(memberId, base64Url(hash), base64Url(salt), new Date().toISOString()).run();
 }
 
 async function memberLocksResponse(request, env, url) {
@@ -152,12 +189,11 @@ async function memberLocksResponse(request, env, url) {
     const nextPassword = String(payload.newPassword || "");
     if (nextPassword.length < 4 || nextPassword.length > 128) return json({ error: "个人密码至少需要 4 位" }, 400, request);
     if (row && !await memberPasswordMatches(String(payload.currentPassword || ""), row)) return json({ error: "Current password is incorrect" }, 401, request);
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const hash = await deriveMemberPassword(nextPassword, salt);
-    await env.DB.prepare(`INSERT INTO finance_member_locks (member_id, password_hash, salt, updated_at)
-      VALUES (?1, ?2, ?3, ?4)
-      ON CONFLICT(member_id) DO UPDATE SET password_hash = excluded.password_hash, salt = excluded.salt, updated_at = excluded.updated_at`)
-      .bind(memberId, base64Url(hash), base64Url(salt), new Date().toISOString()).run();
+    const otherLocks = await env.DB.prepare("SELECT member_id, password_hash, salt FROM finance_member_locks WHERE member_id <> ?1").bind(memberId).all();
+    for (const other of otherLocks?.results || []) {
+      if (await memberPasswordMatches(nextPassword, other)) return json({ error: "这个密码已被其他家庭成员使用，请换一个密码" }, 409, request);
+    }
+    await saveMemberPassword(env.DB, memberId, nextPassword);
     const secret = String(env.APP_PASSWORD || "");
     return json({ ok: true, token: await createSessionToken(secret, { type: "member", memberId }) }, 200, request);
   }
