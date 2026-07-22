@@ -6,6 +6,7 @@ const SCHEMA_SQL = `CREATE TABLE IF NOT EXISTS shared_state (
 )`;
 
 const FINANCE_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS finance_member_locks (member_id TEXT PRIMARY KEY NOT NULL, password_hash TEXT NOT NULL, salt TEXT NOT NULL, updated_at TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS finance_members (id TEXT PRIMARY KEY NOT NULL, display_name TEXT NOT NULL, role TEXT NOT NULL, is_current_user INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1, body TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS finance_accounts (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL, owner_member_id TEXT, current_balance_cents INTEGER NOT NULL DEFAULT 0, include_in_family_assets INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL, body TEXT NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS finance_accounts_owner_idx ON finance_accounts(owner_member_id)`,
@@ -30,6 +31,140 @@ const ALLOWED_ORIGINS = new Set([
   "https://linqing-trading-dashboard.linqingvv5.chatgpt.site"
 ]);
 
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+const encoder = new TextEncoder();
+
+function bytesEqual(left, right) {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) difference |= left[index] ^ right[index];
+  return difference === 0;
+}
+
+function base64Url(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function decodeBase64Url(value) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
+}
+
+async function hmac(secret, value) {
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(value)));
+}
+
+async function passwordMatches(actual, expected) {
+  const [actualHash, expectedHash] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(actual)),
+    crypto.subtle.digest("SHA-256", encoder.encode(expected))
+  ]);
+  return bytesEqual(new Uint8Array(actualHash), new Uint8Array(expectedHash));
+}
+
+async function createSessionToken(secret, claims = {}) {
+  const payload = base64Url(encoder.encode(JSON.stringify({ ...claims, exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS })));
+  return `${payload}.${base64Url(await hmac(secret, payload))}`;
+}
+
+async function sessionClaims(token, secret) {
+  try {
+    const [payload, signature] = String(token || "").split(".");
+    if (!payload || !signature) return null;
+    const expected = await hmac(secret, payload);
+    if (!bytesEqual(decodeBase64Url(signature), expected)) return null;
+    const body = JSON.parse(new TextDecoder().decode(decodeBase64Url(payload)));
+    return Number(body.exp) > Math.floor(Date.now() / 1000) ? body : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function bearerToken(request) {
+  const authorization = request.headers.get("authorization") || "";
+  return authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+}
+
+async function requireSession(request, env) {
+  const password = String(env.APP_PASSWORD || "");
+  const claims = password ? await sessionClaims(bearerToken(request), password) : null;
+  return claims?.type === "site";
+}
+
+async function memberSession(request, env) {
+  const password = String(env.APP_PASSWORD || "");
+  const token = request.headers.get("x-member-authorization") || "";
+  const claims = password ? await sessionClaims(token.startsWith("Bearer ") ? token.slice(7).trim() : "", password) : null;
+  return claims?.type === "member" && claims.memberId ? String(claims.memberId) : null;
+}
+
+async function sessionResponse(request, env) {
+  const password = String(env.APP_PASSWORD || "");
+  if (!password) return json({ error: "网站密码尚未设置" }, 503, request);
+  if (request.method === "GET") {
+    return await requireSession(request, env) ? json({ ok: true }, 200, request) : json({ error: "Unauthorized" }, 401, request);
+  }
+  if (request.method === "POST") {
+    const payload = await request.json().catch(() => ({}));
+    if (!await passwordMatches(String(payload.password || ""), password)) return json({ error: "Unauthorized" }, 401, request);
+    return json({ ok: true, token: await createSessionToken(password, { type: "site" }) }, 200, request);
+  }
+  return new Response("Method Not Allowed", { status: 405, headers: { ...apiHeaders(request), allow: "GET, POST, OPTIONS" } });
+}
+
+async function deriveMemberPassword(password, salt) {
+  const material = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 120000 }, material, 256);
+  return new Uint8Array(bits);
+}
+
+async function memberPasswordMatches(password, row) {
+  if (!row) return false;
+  return bytesEqual(await deriveMemberPassword(password, decodeBase64Url(String(row.salt))), decodeBase64Url(String(row.password_hash)));
+}
+
+async function memberLocksResponse(request, env, url) {
+  if (!await requireSession(request, env)) return json({ error: "Unauthorized" }, 401, request);
+  await ensureFinanceSchema(env.DB);
+  if (url.pathname === "/api/member-locks" && request.method === "GET") {
+    const result = await env.DB.prepare("SELECT member_id FROM finance_member_locks ORDER BY member_id").all();
+    return json({ configuredMemberIds: (result?.results || []).map((row) => String(row.member_id)) }, 200, request);
+  }
+
+  const match = url.pathname.match(/^\/api\/member-locks\/([^/]+)\/(unlock|password)$/);
+  if (!match) return json({ error: "Not Found" }, 404, request);
+  const memberId = decodeURIComponent(match[1]);
+  const action = match[2];
+  const row = await env.DB.prepare("SELECT password_hash, salt FROM finance_member_locks WHERE member_id = ?1").bind(memberId).first();
+  const payload = await request.json().catch(() => ({}));
+
+  if (action === "unlock" && request.method === "POST") {
+    if (!row) return json({ error: "Password not configured", needsSetup: true }, 409, request);
+    if (!await memberPasswordMatches(String(payload.password || ""), row)) return json({ error: "Unauthorized" }, 401, request);
+    const secret = String(env.APP_PASSWORD || "");
+    return json({ ok: true, token: await createSessionToken(secret, { type: "member", memberId }) }, 200, request);
+  }
+
+  if (action === "password" && request.method === "PUT") {
+    const nextPassword = String(payload.newPassword || "");
+    if (nextPassword.length < 4 || nextPassword.length > 128) return json({ error: "个人密码至少需要 4 位" }, 400, request);
+    if (row && !await memberPasswordMatches(String(payload.currentPassword || ""), row)) return json({ error: "Current password is incorrect" }, 401, request);
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const hash = await deriveMemberPassword(nextPassword, salt);
+    await env.DB.prepare(`INSERT INTO finance_member_locks (member_id, password_hash, salt, updated_at)
+      VALUES (?1, ?2, ?3, ?4)
+      ON CONFLICT(member_id) DO UPDATE SET password_hash = excluded.password_hash, salt = excluded.salt, updated_at = excluded.updated_at`)
+      .bind(memberId, base64Url(hash), base64Url(salt), new Date().toISOString()).run();
+    const secret = String(env.APP_PASSWORD || "");
+    return json({ ok: true, token: await createSessionToken(secret, { type: "member", memberId }) }, 200, request);
+  }
+
+  return new Response("Method Not Allowed", { status: 405, headers: { ...apiHeaders(request), allow: action === "unlock" ? "POST, OPTIONS" : "PUT, OPTIONS" } });
+}
+
 function apiHeaders(request) {
   const origin = request.headers.get("origin");
   const headers = {
@@ -39,8 +174,8 @@ function apiHeaders(request) {
   };
   if (origin && ALLOWED_ORIGINS.has(origin)) {
     headers["access-control-allow-origin"] = origin;
-    headers["access-control-allow-methods"] = "GET, POST, OPTIONS";
-    headers["access-control-allow-headers"] = "Content-Type";
+    headers["access-control-allow-methods"] = "GET, POST, PUT, OPTIONS";
+    headers["access-control-allow-headers"] = "Content-Type, Authorization, X-Member-Authorization";
   }
   return headers;
 }
@@ -88,7 +223,15 @@ function parseBodies(result) {
   });
 }
 
-async function readFinanceState(db) {
+function privateOwner(item) {
+  return safeText(item.ownerMemberId || item.payerMemberId || item.bookkeeperMemberId);
+}
+
+function visibleToMember(item, memberId) {
+  return item.isShared === true || (memberId && privateOwner(item) === memberId);
+}
+
+async function readFinanceState(db, memberId = null, includeAll = false) {
   await ensureFinanceSchema(db);
   const [members, accounts, categories, transactions, animals, goals, goalEntries, snapshots, investments, updated] = await db.batch([
     db.prepare("SELECT body FROM finance_members ORDER BY is_current_user DESC, display_name"),
@@ -102,7 +245,9 @@ async function readFinanceState(db) {
     db.prepare("SELECT body FROM finance_investment_summaries ORDER BY name"),
     db.prepare("SELECT value FROM finance_meta WHERE id = 'updated-at'")
   ]);
-  return { state: { version: 1, updatedAt: updated?.results?.[0]?.value || null, members: parseBodies(members), accounts: parseBodies(accounts), categories: parseBodies(categories), transactions: parseBodies(transactions), dreamAnimals: parseBodies(animals), goals: parseBodies(goals), goalEntries: parseBodies(goalEntries), assetSnapshots: parseBodies(snapshots), investmentSummaries: parseBodies(investments) } };
+  const accountBodies = parseBodies(accounts);
+  const transactionBodies = parseBodies(transactions);
+  return { activeMemberId: includeAll ? null : memberId, state: { version: 1, updatedAt: updated?.results?.[0]?.value || null, members: parseBodies(members), accounts: includeAll ? accountBodies : accountBodies.filter((item) => visibleToMember(item, memberId)), categories: parseBodies(categories), transactions: includeAll ? transactionBodies : transactionBodies.filter((item) => visibleToMember(item, memberId)), dreamAnimals: parseBodies(animals), goals: parseBodies(goals), goalEntries: parseBodies(goalEntries), assetSnapshots: parseBodies(snapshots), investmentSummaries: parseBodies(investments) } };
 }
 
 function requireArray(state, key) {
@@ -114,20 +259,26 @@ function safeText(value, fallback = "") {
   return String(value == null ? fallback : value);
 }
 
-async function writeFinanceState(request, db) {
+async function writeFinanceState(request, db, memberId = null) {
   const payload = await request.json();
   const state = payload?.state;
   if (!state || typeof state !== "object" || Array.isArray(state)) return json({ error: "state must be an object" }, 400, request);
   const members = requireArray(state, "members");
-  const accounts = requireArray(state, "accounts");
+  let accounts = requireArray(state, "accounts");
   const categories = requireArray(state, "categories");
-  const transactions = requireArray(state, "transactions");
+  let transactions = requireArray(state, "transactions");
   const animals = requireArray(state, "dreamAnimals");
   const goals = requireArray(state, "goals");
   const goalEntries = Array.isArray(state.goalEntries) ? state.goalEntries : [];
   const snapshots = Array.isArray(state.assetSnapshots) ? state.assetSnapshots : [];
   const investments = Array.isArray(state.investmentSummaries) ? state.investmentSummaries : [];
   await ensureFinanceSchema(db);
+  const existing = (await readFinanceState(db, null, true)).state;
+  const keepPrivateAccount = (item) => item.isShared !== true && (!memberId || privateOwner(item) !== memberId);
+  const keepPrivateTransaction = (item) => item.isShared !== true && (!memberId || privateOwner(item) !== memberId);
+  const allowedIncoming = (item) => item.isShared === true || Boolean(memberId && privateOwner(item) === memberId);
+  accounts = [...existing.accounts.filter(keepPrivateAccount), ...accounts.filter(allowedIncoming)];
+  transactions = [...existing.transactions.filter(keepPrivateTransaction), ...transactions.filter(allowedIncoming)];
   const statements = [
     db.prepare("DELETE FROM finance_members"), db.prepare("DELETE FROM finance_accounts"),
     db.prepare("DELETE FROM finance_categories"), db.prepare("DELETE FROM finance_transactions"),
@@ -157,17 +308,28 @@ async function writeFinanceState(request, db) {
   const updatedAt = new Date().toISOString();
   statements.push(db.prepare("INSERT INTO finance_meta (id, value) VALUES ('updated-at', ?1) ON CONFLICT(id) DO UPDATE SET value = excluded.value").bind(updatedAt));
   await db.batch(statements);
-  return json({ state: { ...state, updatedAt } }, 200, request);
+  return json(await readFinanceState(db, memberId), 200, request);
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/api/session") {
+      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: apiHeaders(request) });
+      return sessionResponse(request, env);
+    }
+    if (url.pathname === "/api/member-locks" || url.pathname.startsWith("/api/member-locks/")) {
+      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: apiHeaders(request) });
+      try { return await memberLocksResponse(request, env, url); }
+      catch (error) { return json({ error: error instanceof Error ? error.message : "个人密码服务异常" }, 500, request); }
+    }
     if (url.pathname === "/api/finance/state") {
       try {
         if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: apiHeaders(request) });
-        if (request.method === "GET") return json(await readFinanceState(env.DB), 200, request);
-        if (request.method === "POST") return await writeFinanceState(request, env.DB);
+        if (!await requireSession(request, env)) return json({ error: "Unauthorized" }, 401, request);
+        const memberId = await memberSession(request, env);
+        if (request.method === "GET") return json(await readFinanceState(env.DB, memberId), 200, request);
+        if (request.method === "POST") return await writeFinanceState(request, env.DB, memberId);
         return new Response("Method Not Allowed", { status: 405, headers: { ...apiHeaders(request), allow: "GET, POST, OPTIONS" } });
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : "资金数据服务异常" }, 500, request);
@@ -176,6 +338,7 @@ export default {
     if (url.pathname === "/api/state") {
       try {
         if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: apiHeaders(request) });
+        if (!await requireSession(request, env)) return json({ error: "Unauthorized" }, 401, request);
         if (request.method === "GET") return json(await readState(env.DB), 200, request);
         if (request.method === "POST") return await writeState(request, env.DB);
         return new Response("Method Not Allowed", { status: 405, headers: { ...apiHeaders(request), allow: "GET, POST, OPTIONS" } });

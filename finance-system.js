@@ -338,13 +338,14 @@
           <button type="button" data-open-view="ledger"><span>我的账本</span><b>查看个人与家庭明细 ›</b></button>
           <button type="button" data-open-view="accounts"><span>我的账户</span><b>余额与本月资金流 ›</b></button>
           <button type="button" data-open-view="members"><span>家庭成员</span><b>成员与共享账目 ›</b></button>
-          ${window.FinanceAuth?.household ? `<button type="button" data-copy-invite><span>家庭邀请码</span><b>${escapeHtml(window.FinanceAuth.household.inviteCode || "--")} · 点击复制</b></button><button type="button" data-cloud-sign-out><span>退出登录</span><b>${escapeHtml(window.FinanceAuth.user?.email || "")} ›</b></button>` : ""}
+          ${window.FinanceAuth?.activeMemberId ? `<button type="button" data-change-member-password><span>修改个人密码</span><b>仅用于我的个人页 ›</b></button><button type="button" data-leave-member><span>退出个人页</span><b>返回家庭共享区域 ›</b></button>` : ""}
+          ${window.FinanceAuth?.household ? `<button type="button" data-cloud-sign-out><span>退出整个系统</span><b>重新输入总密码 ›</b></button>` : ""}
         </section>
       </div>`;
   }
 
   function memberRows() {
-    return state.members.filter((item) => item.isActive).map((member) => `<div class="finance-account-row"><div><span>${escapeHtml(member.role)}</span><strong>${escapeHtml(member.displayName)}${member.isCurrentUser ? " · 当前用户" : ""}</strong></div><div><span>个人账户</span><strong>${state.accounts.filter((account) => account.ownerMemberId === member.id && !account.isArchived).length} 个</strong></div><div><span>本月支出</span><strong>${money(sum(state.transactions.filter((item) => item.payerMemberId === member.id && item.type === "EXPENSE" && monthKey(item.occurredAt) === ledgerMonth).map((item) => item.amountCents)))}</strong></div><div><span>共享账目</span><strong>${state.transactions.filter((item) => item.bookkeeperMemberId === member.id && item.isShared).length} 条</strong></div></div>`).join("");
+    return state.members.filter((item) => item.isActive).map((member) => `<div class="finance-account-row"><div><span>${escapeHtml(member.role)}</span><strong>${escapeHtml(member.displayName)}${member.isCurrentUser ? " · 当前个人页" : ""}</strong></div><div><span>个人区域</span><strong>独立密码保护</strong></div><div><button type="button" class="finance-secondary" data-member-portal="${escapeAttribute(member.id)}">${member.isCurrentUser ? "已进入" : "进入个人页"}</button></div></div>`).join("");
   }
 
   function renderDreams() {
@@ -414,6 +415,10 @@
     if (open) { openFinanceView(open.dataset.openView); return; }
     if (event.target.closest("[data-add-transaction]")) { openTransactionModal(); return; }
     if (event.target.closest("[data-add-member]")) { openMemberModal(); return; }
+    const memberPortal = event.target.closest("[data-member-portal]");
+    if (memberPortal) { void openMemberPortal(memberPortal.dataset.memberPortal); return; }
+    if (event.target.closest("[data-change-member-password]")) { void openMemberPortal(window.FinanceAuth?.activeMemberId, true); return; }
+    if (event.target.closest("[data-leave-member]")) { void leaveMemberPortal(); return; }
     if (event.target.closest("[data-add-account]")) { openAccountModal(); return; }
     if (event.target.closest("[data-add-category]")) { openCategoryModal(); return; }
     const editAccount = event.target.closest("[data-edit-account]");
@@ -446,7 +451,6 @@
     }
     if (event.target.closest("[data-export-csv]")) { exportCsv(); return; }
     if (event.target.closest("[data-import-csv]")) { els.content.querySelector("[data-csv-file]")?.click(); return; }
-    if (event.target.closest("[data-copy-invite]")) { void navigator.clipboard?.writeText(window.FinanceAuth?.household?.inviteCode || ""); showToast("家庭邀请码已复制"); return; }
     if (event.target.closest("[data-cloud-sign-out]")) { void window.FinanceAuth?.signOut(); return; }
     if (event.target.closest("[data-refresh-investment]")) { refreshDerivedState(); queueSave(); renderInvestments(); showToast("投资账户摘要已刷新"); }
   }
@@ -474,6 +478,65 @@
     transaction.note = cell.textContent.trim();
     transaction.updatedAt = new Date().toISOString();
     queueSave();
+  }
+
+  async function openMemberPortal(memberId, changing = false) {
+    const member = state.members.find((item) => item.id === memberId);
+    if (!member || !window.FinanceAuth?.memberLockStatus) return;
+    let configured = changing;
+    try {
+      const status = await window.FinanceAuth.memberLockStatus();
+      configured = status.configuredMemberIds?.includes(memberId) || changing;
+    } catch (_) {
+      showToast("暂时无法连接个人密码服务");
+      return;
+    }
+    const title = changing ? `修改${member.displayName}的个人密码` : configured ? `进入${member.displayName}的个人页` : `设置${member.displayName}的个人密码`;
+    const fields = changing
+      ? `<label class="is-wide"><span>当前个人密码</span><input name="currentPassword" type="password" autocomplete="current-password" required autofocus></label><label class="is-wide"><span>新个人密码</span><input name="newPassword" type="password" minlength="4" autocomplete="new-password" required></label><label class="is-wide"><span>再次输入新密码</span><input name="confirmPassword" type="password" minlength="4" autocomplete="new-password" required></label>`
+      : configured
+        ? `<label class="is-wide"><span>个人密码</span><input name="password" type="password" autocomplete="current-password" required autofocus></label>`
+        : `<p class="is-wide auth-message">这是首次进入，请由本人设置至少 4 位的独立密码。</p><label class="is-wide"><span>设置个人密码</span><input name="newPassword" type="password" minlength="4" autocomplete="new-password" required autofocus></label><label class="is-wide"><span>再次输入密码</span><input name="confirmPassword" type="password" minlength="4" autocomplete="new-password" required></label>`;
+    const modal = createModal(title, `<form class="finance-form">${fields}<p class="is-wide auth-message" data-member-message></p><div class="finance-form-actions"><button type="button" class="finance-secondary" data-close-finance-modal>取消</button><button class="finance-primary" type="submit">${changing ? "保存新密码" : "进入个人页"}</button></div></form>`);
+    modal.querySelector("form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const values = new FormData(form);
+      const message = form.querySelector("[data-member-message]");
+      const button = form.querySelector("button[type=submit]");
+      const newPassword = String(values.get("newPassword") || "");
+      if ((changing || !configured) && newPassword !== String(values.get("confirmPassword") || "")) {
+        message.textContent = "两次输入的密码不一致。"; message.classList.add("is-error"); return;
+      }
+      button.disabled = true; message.textContent = "正在验证…"; message.classList.remove("is-error");
+      const result = changing || !configured
+        ? await window.FinanceAuth.setMemberPassword(memberId, newPassword, String(values.get("currentPassword") || ""))
+        : await window.FinanceAuth.unlockMember(memberId, String(values.get("password") || ""));
+      button.disabled = false;
+      if (!result.ok) {
+        message.textContent = result.status === 401 ? "个人密码不正确。" : (result.error || "暂时无法进入，请稍后重试。");
+        message.classList.add("is-error"); return;
+      }
+      closeModal(modal);
+      await loadRemoteState();
+      activateMember(memberId);
+      localStorage.setItem(cacheKey(), JSON.stringify(state));
+      openFinanceView("mine");
+      showToast(changing ? "个人密码已更新" : "已进入个人页");
+    });
+  }
+
+  async function leaveMemberPortal() {
+    window.FinanceAuth?.leaveMember?.();
+    await loadRemoteState();
+    state.members.forEach((item) => { item.isCurrentUser = false; });
+    localStorage.setItem(cacheKey(), JSON.stringify(state));
+    openFinanceView("members");
+    showToast("已退出个人页");
+  }
+
+  function activateMember(memberId) {
+    state.members.forEach((item) => { item.isCurrentUser = Boolean(memberId && item.id === memberId); });
   }
 
   function openTransactionModal(prefill = {}) {
@@ -950,7 +1013,11 @@
       const response = await fetch(API_URL, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json();
-      if (payload.state && hasFinanceData(payload.state)) state = normalizeState(payload.state);
+      if (payload.state && Array.isArray(payload.state.accounts)) {
+        if (window.FinanceAuth?.activeMemberId && payload.activeMemberId !== window.FinanceAuth.activeMemberId) window.FinanceAuth.leaveMember();
+        state = normalizeState(payload.state);
+        activateMember(payload.activeMemberId || null);
+      }
       else await pushRemoteState();
       localStorage.setItem(cacheKey(), JSON.stringify(state));
       syncText = "已从云端读取保存数据";
@@ -998,7 +1065,7 @@
 
   function cacheKey() {
     const auth = window.FinanceAuth;
-    return auth?.user?.id && auth?.household?.id ? `${CACHE_KEY}:${auth.user.id}:${auth.household.id}` : CACHE_KEY;
+    return auth?.activeMemberId ? `${CACHE_KEY}:member-v2:${auth.activeMemberId}` : `${CACHE_KEY}:shared-v2`;
   }
 
   function loadCache() {
@@ -1014,7 +1081,7 @@
       updatedAt: String(raw.updatedAt || new Date().toISOString()),
       members: Array.isArray(raw.members) && raw.members.length ? raw.members : fallback.members,
       categories: (Array.isArray(raw.categories) && raw.categories.length ? raw.categories : fallback.categories).map((category) => category.id === "expense-food" ? { ...category, name: "餐饮" } : category),
-      accounts: Array.isArray(raw.accounts) && raw.accounts.length ? raw.accounts : fallback.accounts,
+      accounts: Array.isArray(raw.accounts) ? raw.accounts : fallback.accounts,
       transactions: Array.isArray(raw.transactions) ? raw.transactions : [],
       dreamAnimals,
       goals,

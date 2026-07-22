@@ -3,6 +3,7 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $dist = Join-Path $root 'dist'
 $client = Join-Path $dist 'client'
 $server = Join-Path $dist 'server'
+$hosting = Join-Path $dist '.openai'
 
 if (Test-Path -LiteralPath $dist) {
   $resolvedRoot = [IO.Path]::GetFullPath($root)
@@ -15,6 +16,7 @@ if (Test-Path -LiteralPath $dist) {
 
 New-Item -ItemType Directory -Path $client -Force | Out-Null
 New-Item -ItemType Directory -Path $server -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $hosting 'drizzle') -Force | Out-Null
 
 $assets = @(
   'finance.html',
@@ -23,10 +25,8 @@ $assets = @(
   'data.js',
   'trade-board.js',
   'finance-system.js',
-  'supabase-config.js',
   'supabase-auth.js',
   'supabase-auth.css',
-  'sync-auth.js',
   'manifest.webmanifest',
   'finance-manifest.webmanifest',
   'app-icon.svg'
@@ -34,10 +34,10 @@ $assets = @(
 foreach ($asset in $assets) {
   Copy-Item -LiteralPath (Join-Path $root $asset) -Destination (Join-Path $client $asset) -Force
 }
-New-Item -ItemType Directory -Path (Join-Path $client 'vendor') -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $root 'vendor\supabase.min.js') -Destination (Join-Path $client 'vendor\supabase.min.js') -Force
 Copy-Item -LiteralPath (Join-Path $root 'finance.html') -Destination (Join-Path $client 'index.html') -Force
 Copy-Item -LiteralPath (Join-Path $root 'worker\site-worker.js') -Destination (Join-Path $server 'index.js') -Force
+Copy-Item -LiteralPath (Join-Path $root '.openai\hosting.json') -Destination (Join-Path $hosting 'hosting.json') -Force
+Copy-Item -Path (Join-Path $root 'drizzle\*.sql') -Destination (Join-Path $hosting 'drizzle') -Force
 
 $wrangler = @{
   main = 'index.js'
