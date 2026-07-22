@@ -118,6 +118,76 @@ body.finance-mode #finance-system-view {
   box-shadow: 0 2px 8px rgba(15, 35, 65, .08);
 }
 
+.cockpit-hero {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr);
+  gap: 12px;
+  margin: 0 16px 12px;
+  padding: 18px;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #172033, #293958);
+}
+
+.cockpit-hero > div:first-child span,
+.cockpit-hero > div:first-child small { display: block; color: rgba(255,255,255,.72); }
+.cockpit-hero > div:first-child strong { display: block; margin: 6px 0 4px; font-size: clamp(28px, 5vw, 42px); }
+.cockpit-hero-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.cockpit-metric { min-width: 0; padding: 12px; border-radius: 12px; background: #fff; }
+.cockpit-hero .cockpit-metric { background: rgba(255,255,255,.1); }
+.cockpit-metric span { display: block; color: var(--finance-muted); font-size: 12px; }
+.cockpit-hero .cockpit-metric span { color: rgba(255,255,255,.7); }
+.cockpit-metric strong { display: block; margin-top: 6px; color: var(--finance-ink); font-size: 18px; }
+.cockpit-hero .cockpit-metric strong { color: #fff; }
+.cockpit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 16px 16px; }
+.cockpit-panel { margin: 0; }
+.cockpit-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--finance-line); }
+.cockpit-row span { color: var(--finance-muted); }
+.cockpit-row.is-total { background: #fff7f7; color: var(--finance-red); }
+.account-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0 16px 12px; }
+.account-groups { display: grid; gap: 12px; padding: 0 16px 16px; }
+.account-group { margin: 0; overflow: hidden; }
+.settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 16px 16px; }
+.settings-card { margin: 0; padding-bottom: 14px; }
+.settings-card.is-wide { grid-column: 1 / -1; }
+.settings-list, .settings-category-grid { display: grid; gap: 0; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--finance-line); }
+.settings-row span, .settings-row small { display: block; color: var(--finance-muted); font-size: 12px; }
+.settings-row strong { display: block; margin: 3px 0; }
+.settings-category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.settings-category-grid > div { padding: 12px 16px; border-top: 1px solid var(--finance-line); }
+.settings-category-grid span { display: block; margin-top: 5px; color: var(--finance-muted); font-size: 12px; line-height: 1.6; }
+.settings-tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px 0; }
+.settings-tags button { border: 0; border-radius: 999px; padding: 7px 10px; color: var(--finance-ink); background: var(--finance-soft); }
+.allocation-rule { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; padding: 12px 16px 0; }
+.allocation-rule div { padding: 9px 5px; text-align: center; border-radius: 9px; background: var(--finance-soft); }
+.allocation-rule span, .allocation-rule strong { display: block; }
+.allocation-rule span { color: var(--finance-muted); font-size: 11px; }
+.allocation-rule strong { margin-top: 4px; }
+.dream-fund-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0 14px; }
+.dream-fund-grid article { padding: 14px; border: 1px solid var(--finance-line); border-radius: 12px; }
+.dream-fund-grid article > div:first-child span, .dream-fund-grid article > div:first-child strong { display: block; }
+.dream-fund-grid article > div:first-child span { color: var(--finance-muted); font-size: 11px; }
+.dream-fund-grid article > b { display: block; margin: 8px 0; font-size: 22px; }
+.dream-fund-grid dl { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 7px; margin: 0 0 8px; }
+.dream-fund-grid dl div { padding: 7px; border-radius: 8px; background: var(--finance-soft); }
+.dream-fund-grid dt { color: var(--finance-muted); font-size: 10px; }
+.dream-fund-grid dd { margin: 3px 0 0; font-weight: 700; }
+.dream-fund-grid p, .settings-copy { margin: 10px 16px; color: var(--finance-muted); font-size: 12px; line-height: 1.6; }
+.finance-secondary.is-danger { color: #c93636; }
+
+@media (max-width: 680px) {
+  .cockpit-hero { grid-template-columns: 1fr; padding: 14px; }
+  .cockpit-hero-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cockpit-metric { padding: 9px; }
+  .cockpit-metric strong { font-size: 14px; }
+  .cockpit-grid, .settings-grid { grid-template-columns: 1fr; gap: 10px; }
+  .account-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .settings-card.is-wide { grid-column: auto; }
+  .dream-fund-grid { grid-template-columns: 1fr; }
+  .finance-page-head { padding-bottom: 12px; }
+}
+
 .finance-floating-add {
   position: fixed;
   right: max(18px, calc((100vw - 980px) / 2 + 18px));

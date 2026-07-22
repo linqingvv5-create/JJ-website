@@ -26,6 +26,7 @@
   api.memberLockStatus = memberLockStatus;
   api.unlockMember = unlockMember;
   api.setMemberPassword = setMemberPassword;
+  api.deleteMemberPassword = deleteMemberPassword;
   api.leaveMember = leaveMember;
 
   if (!gate || !card) return;
@@ -71,6 +72,12 @@
     if (!response.ok) return { ok: false, status: response.status, ...payload };
     storeMemberSession(memberId, payload.token);
     return { ok: true };
+  }
+
+  async function deleteMemberPassword(memberId) {
+    const response = await authenticatedFetch(`/api/member-locks/${encodeURIComponent(memberId)}/password`, { method: "DELETE" });
+    if (!response.ok) throw new Error("无法删除成员密码");
+    return response.json();
   }
 
   function storeMemberSession(memberId, token) {

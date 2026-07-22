@@ -59,7 +59,10 @@ const member = api.getState().members.find((item) => item.isCurrentUser);
 const month = new Date().toISOString().slice(0, 7);
 const initialInvestments = api.investmentSummaries();
 const initialNetAssets = api.familyAssetTotals(initialInvestments).netAssets;
-assert.equal(api.getState().categories.find((item) => item.id === "expense-food").name, "餐饮");
+assert.equal(api.getState().categories.find((item) => item.id === "expense-food").name, "吃饭");
+assert.deepEqual(JSON.parse(JSON.stringify(api.getState().categories.filter((item) => !item.parentId && item.isActive).map((item) => item.name))), ["固定开支", "生活开支", "机动开支", "Dream基金", "投资转入"]);
+assert.equal(api.getState().dreamFunds.length, 4, "虚拟资金池包含短期、长期、本人投资本金和家庭公共资金");
+assert.equal(api.getState().allocationRules[0].fixedBps + api.getState().allocationRules[0].livingBps + api.getState().allocationRules[0].flexBps + api.getState().allocationRules[0].dreamBps + api.getState().allocationRules[0].investmentBps, 10000, "默认收入分配比例合计为100% ");
 
 // 场景 A：微信支付 35 元家庭餐饮支出。
 api.applyTransaction({
@@ -116,8 +119,8 @@ assert.equal(api.getState().investmentSummaries[0].totalAssetCents, 98000000);
 
 assert.deepEqual(
   JSON.parse(JSON.stringify(api.parseRoute("#/funds/members"))),
-  { section: "funds", subtab: "members", view: "members", path: "#/funds/members" },
-  "资金模块使用二级路由"
+  { section: "funds", subtab: "settings", view: "settings", path: "#/funds/settings" },
+  "旧成员页链接自动进入设置"
 );
 assert.deepEqual(
   JSON.parse(JSON.stringify(api.parseRoute("#/investment/holdings"))),

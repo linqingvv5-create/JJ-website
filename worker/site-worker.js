@@ -23,7 +23,8 @@ const FINANCE_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS finance_asset_snapshots (id TEXT PRIMARY KEY NOT NULL, snapshot_date TEXT NOT NULL, scope TEXT NOT NULL, scope_id TEXT, net_asset_cents INTEGER NOT NULL DEFAULT 0, body TEXT NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS finance_asset_snapshots_date_idx ON finance_asset_snapshots(snapshot_date DESC)`,
   `CREATE TABLE IF NOT EXISTS finance_investment_summaries (id TEXT PRIMARY KEY NOT NULL, investment_account_id TEXT NOT NULL, name TEXT NOT NULL, total_asset_cents INTEGER NOT NULL DEFAULT 0, profit_loss_cents INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, body TEXT NOT NULL)`,
-  `CREATE TABLE IF NOT EXISTS finance_meta (id TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)`
+  `CREATE TABLE IF NOT EXISTS finance_meta (id TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS finance_extensions (id TEXT PRIMARY KEY NOT NULL, body TEXT NOT NULL, updated_at TEXT NOT NULL)`
 ];
 
 const ALLOWED_ORIGINS = new Set([
@@ -36,7 +37,7 @@ const encoder = new TextEncoder();
 
 const CANONICAL_FINANCE_LABELS = {
   members: {
-    "member-me": { displayName: "我", role: "本人" }
+    "member-me": { displayName: "白白", role: "本人" }
   },
   accounts: {
     "account-bank": "银行卡", "account-wechat": "微信", "account-alipay": "支付宝",
@@ -328,7 +329,7 @@ function visibleToMember(item, memberId) {
 
 async function readFinanceState(db, memberId = null, includeAll = false) {
   await ensureFinanceSchema(db);
-  const [members, accounts, categories, transactions, animals, goals, goalEntries, snapshots, investments, updated] = await db.batch([
+  const [members, accounts, categories, transactions, animals, goals, goalEntries, snapshots, investments, updated, extensions] = await db.batch([
     db.prepare("SELECT body FROM finance_members ORDER BY is_current_user DESC, display_name"),
     db.prepare("SELECT body FROM finance_accounts ORDER BY name"),
     db.prepare("SELECT body FROM finance_categories ORDER BY direction, name"),
@@ -338,11 +339,13 @@ async function readFinanceState(db, memberId = null, includeAll = false) {
     db.prepare("SELECT body FROM finance_goal_entries ORDER BY occurred_at DESC"),
     db.prepare("SELECT body FROM finance_asset_snapshots ORDER BY snapshot_date DESC"),
     db.prepare("SELECT body FROM finance_investment_summaries ORDER BY name"),
-    db.prepare("SELECT value FROM finance_meta WHERE id = 'updated-at'")
+    db.prepare("SELECT value FROM finance_meta WHERE id = 'updated-at'"),
+    db.prepare("SELECT body FROM finance_extensions WHERE id = 'funds-v2'")
   ]);
   const accountBodies = parseBodies(accounts);
   const transactionBodies = parseBodies(transactions);
-  return { activeMemberId: includeAll ? null : memberId, state: canonicalizeFinanceState({ version: 1, updatedAt: updated?.results?.[0]?.value || null, members: parseBodies(members), accounts: includeAll ? accountBodies : accountBodies.filter((item) => visibleToMember(item, memberId)), categories: parseBodies(categories), transactions: includeAll ? transactionBodies : transactionBodies.filter((item) => visibleToMember(item, memberId)), dreamAnimals: parseBodies(animals), goals: parseBodies(goals), goalEntries: parseBodies(goalEntries), assetSnapshots: parseBodies(snapshots), investmentSummaries: parseBodies(investments) }) };
+  const extension = parseBodies(extensions)[0] || {};
+  return { activeMemberId: includeAll ? null : memberId, state: canonicalizeFinanceState({ version: 2, updatedAt: updated?.results?.[0]?.value || null, members: parseBodies(members), accounts: includeAll ? accountBodies : accountBodies.filter((item) => visibleToMember(item, memberId)), categories: parseBodies(categories), transactions: includeAll ? transactionBodies : transactionBodies.filter((item) => visibleToMember(item, memberId)), dreamAnimals: parseBodies(animals), goals: parseBodies(goals), goalEntries: parseBodies(goalEntries), assetSnapshots: parseBodies(snapshots), investmentSummaries: parseBodies(investments), dreamFunds: Array.isArray(extension.dreamFunds) ? extension.dreamFunds : [], tags: Array.isArray(extension.tags) ? extension.tags : [], allocationRules: Array.isArray(extension.allocationRules) ? extension.allocationRules : [] }) };
 }
 
 function requireArray(state, key) {
@@ -367,6 +370,7 @@ async function writeFinanceState(request, db, memberId = null) {
   const goalEntries = Array.isArray(state.goalEntries) ? state.goalEntries : [];
   const snapshots = Array.isArray(state.assetSnapshots) ? state.assetSnapshots : [];
   const investments = Array.isArray(state.investmentSummaries) ? state.investmentSummaries : [];
+  const extensions = { dreamFunds: Array.isArray(state.dreamFunds) ? state.dreamFunds : [], tags: Array.isArray(state.tags) ? state.tags : [], allocationRules: Array.isArray(state.allocationRules) ? state.allocationRules : [] };
   await ensureFinanceSchema(db);
   const existing = (await readFinanceState(db, null, true)).state;
   const keepPrivateAccount = (item) => item.isShared !== true && (!memberId || privateOwner(item) !== memberId);
@@ -402,6 +406,7 @@ async function writeFinanceState(request, db, memberId = null) {
   investments.forEach((item) => statements.push(db.prepare("INSERT INTO finance_investment_summaries (id, investment_account_id, name, total_asset_cents, profit_loss_cents, updated_at, body) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)").bind(safeText(item.id), safeText(item.investmentAccountId), safeText(item.name), Math.trunc(Number(item.totalAssetCents) || 0), Math.trunc(Number(item.profitLossCents) || 0), safeText(item.updatedAt, new Date().toISOString()), JSON.stringify(item))));
   const updatedAt = new Date().toISOString();
   statements.push(db.prepare("INSERT INTO finance_meta (id, value) VALUES ('updated-at', ?1) ON CONFLICT(id) DO UPDATE SET value = excluded.value").bind(updatedAt));
+  statements.push(db.prepare("INSERT INTO finance_extensions (id, body, updated_at) VALUES ('funds-v2', ?1, ?2) ON CONFLICT(id) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at").bind(JSON.stringify(extensions), updatedAt));
   await db.batch(statements);
   return json(await readFinanceState(db, memberId), 200, request);
 }
