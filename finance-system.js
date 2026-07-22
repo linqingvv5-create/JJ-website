@@ -1234,7 +1234,7 @@
     const holdings = Array.isArray(source.holdings) ? source.holdings : [];
     return (source.accounts || []).map((account) => {
       const rows = holdings.filter((holding) => String(holding.accountId) === String(account.id));
-      const marketValueCents = Math.round(sum(rows.map((holding) => Number.isFinite(Number(holding.marketValueOverride)) ? Number(holding.marketValueOverride) : (Number(holding.currentPrice) || 0) * (Number(holding.shares) || 0))) * 100);
+      const marketValueCents = Math.round((sum(rows.map((holding) => Number.isFinite(Number(holding.marketValueOverride)) ? Number(holding.marketValueOverride) : (Number(holding.currentPrice) || 0) * (Number(holding.shares) || 0))) + Math.max(0, Number(account.repoBalance) || 0)) * 100);
       const profitLossCents = Math.round(sum(rows.map((holding) => Number.isFinite(Number(holding.floatingPnlOverride)) ? Number(holding.floatingPnlOverride) : ((Number(holding.currentPrice) || 0) - (Number(holding.cost) || 0)) * (Number(holding.shares) || 0) + (Number(holding.floatingPnlAdjustment) || 0))) * 100);
       const availableCashCents = Math.round((Number(account.availableCash) || 0) * 100);
       const totalAssetCents = marketValueCents + availableCashCents;

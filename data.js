@@ -555,3 +555,22 @@ window.APP_DATA = {
     { id: "zjg-history-1", holdingId: "family-600895", planId: "zjg-t-3", cycleNo: 1, sellPrice: 36.74, shares: 300, buyPrice: 33.5, profit: 972, completedAt: "" }
   ]
 };
+
+// 2026-07-22 22:52 券商持仓截图快照。保留原有计划与历史，只校准当前账户和持仓。
+(function applyBrokerSnapshot() {
+  const snapshotAccounts = {
+    self: { name: "华福证券（**1348）", availableCash: 844.63, repoBalance: 209000, repoShares: 2090, repoPrice: 100 },
+    family: { name: "兴业证券（**7977）", availableCash: 100743.14, repoBalance: 300000, repoShares: 0, repoPrice: 100 }
+  };
+  const snapshotHoldings = [
+    { id: "self-002242", accountId: "self", name: "九阳股份", code: "002242", shares: 20000, availableShares: 20000, cost: 11.174, currentPrice: 8.190, marketValueOverride: 163800, floatingPnlOverride: -59784.86, floatingPnlAdjustment: -104.86 },
+    { id: "family-002594", accountId: "family", name: "比亚迪", code: "002594", shares: 1400, availableShares: 1400, cost: 83.951, currentPrice: 91.570, marketValueOverride: 128198, floatingPnlOverride: 10584.14, floatingPnlAdjustment: -82.46 },
+    { id: "family-600036", accountId: "family", name: "招商银行", code: "600036", shares: 200, availableShares: 200, cost: 37.022, currentPrice: 38.710, marketValueOverride: 7742, floatingPnlOverride: 327.57, floatingPnlAdjustment: -10.03 },
+    { id: "family-600895", accountId: "family", name: "张江高科", code: "600895", shares: 2100, availableShares: 2100, cost: 32.049, currentPrice: 27.730, marketValueOverride: 58233, floatingPnlOverride: -9108.30, floatingPnlAdjustment: -38.40 },
+    { id: "family-600900", accountId: "family", name: "长江电力", code: "600900", shares: 600, availableShares: 600, cost: 25.950, currentPrice: 29.090, marketValueOverride: 17454, floatingPnlOverride: 1868.94, floatingPnlAdjustment: -15.06 }
+  ];
+  window.APP_DATA.accounts = window.APP_DATA.accounts.map((account) => ({ ...account, ...(snapshotAccounts[account.id] || {}) }));
+  const snapshotIds = new Set(snapshotHoldings.map((holding) => holding.id));
+  window.APP_DATA.holdings = window.APP_DATA.holdings.filter((holding) => holding.id !== "self-002594" && !snapshotIds.has(holding.id)).concat(snapshotHoldings);
+  window.APP_DATA.positionLots = window.APP_DATA.positionLots.filter((lot) => lot.holdingId !== "self-002594" && !snapshotIds.has(lot.holdingId)).concat(snapshotHoldings.map((holding) => ({ id: `${holding.id}-snapshot-20260722`, holdingId: holding.id, side: "buy", label: "2026-07-22券商持仓快照", price: holding.cost, shares: holding.shares, source: "snapshot" })));
+})();

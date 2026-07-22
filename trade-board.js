@@ -325,7 +325,7 @@
   function renderFundsManagement() {
     if (!fundsOpen) return;
     recalculateAllHoldings();
-    const totalMarket = sum(state.holdings.map(marketValue));
+    const totalMarket = sum(state.holdings.map(marketValue)) + sum(state.accounts.map(repoValue));
     const securityCash = sum(state.accounts.map((account) => account.availableCash));
     const bankCash = Number(state.bankCash) || 0;
     const totalAssets = totalMarket + securityCash + bankCash;
@@ -343,8 +343,8 @@
           <div class="fund-account-list">
             ${state.accounts.map((account) => {
               const holdings = state.holdings.filter((holding) => holding.accountId === account.id);
-              const market = sum(holdings.map(marketValue));
-              return `<div class="fund-account-row"><div><strong>${html(account.name)}</strong><span>市值 ${wholeCurrency(market)}</span></div><div><span>可用资金</span><strong>${wholeCurrency(account.availableCash)}</strong></div><button type="button" data-fund-transfer="${attr(account.id)}">转入/转出</button></div>`;
+              const market = sum(holdings.map(marketValue)) + repoValue(account);
+              return `<div class="fund-account-row"><div><strong>${html(account.name)}</strong><span>市值 ${wholeCurrency(market)}${repoValue(account) ? ` · 含标准券 ${wholeCurrency(repoValue(account))}` : ""}</span></div><div><span>可用资金</span><strong>${wholeCurrency(account.availableCash)}</strong></div><button type="button" data-fund-transfer="${attr(account.id)}">转入/转出</button></div>`;
             }).join("")}
             <div class="fund-account-row bank-account-row"><div><strong>银行资金</strong><span>活期、大额存单等</span></div><div><span>当前合计</span><strong>${wholeCurrency(bankCash)}</strong></div><button type="button" data-edit-bank-funds>调整</button></div>
           </div>
@@ -407,7 +407,7 @@
 
   function renderHome() {
     recalculateAllHoldings();
-    const totalMarket = sum(state.holdings.map(marketValue));
+    const totalMarket = sum(state.holdings.map(marketValue)) + sum(state.accounts.map(repoValue));
     const totalCash = sum(state.accounts.map((account) => account.availableCash));
     const totalPnl = sum(state.holdings.map(floatingPnl));
     const totalAsset = totalMarket + totalCash + (state.bankCash || 0);
@@ -431,7 +431,7 @@
 
   function renderAccount(account) {
     const holdings = state.holdings.filter((holding) => holding.accountId === account.id);
-    const mv = sum(holdings.map(marketValue));
+    const mv = sum(holdings.map(marketValue)) + repoValue(account);
     const pnl = sum(holdings.map(floatingPnl));
     const asset = mv + (account.availableCash || 0);
     const position = asset > 0 ? mv / asset * 100 : null;
@@ -448,8 +448,12 @@
         <div class="portfolio-table-head portfolio-grid">
           <span class="section-title">股票/市值</span><span class="section-title">盈亏/盈亏率</span><span class="section-title">持仓</span><span class="section-title">成本/现价</span><span class="section-title">下一步</span>
         </div>
-        <div class="portfolio-list">${holdings.map(renderHolding).join("")}</div>
+        <div class="portfolio-list">${holdings.map(renderHolding).join("")}${repoValue(account) ? renderRepoHolding(account) : ""}</div>
       </section>`;
+  }
+
+  function renderRepoHolding(account) {
+    return `<article class="portfolio-stock portfolio-repo"><div class="portfolio-grid portfolio-values"><div class="portfolio-name"><strong class="cell-primary">标准券</strong><span class="cell-secondary">${wholeNumber(repoValue(account))}</span></div><div class="two-line-number portfolio-pnl"><strong class="cell-primary">0</strong><span class="cell-primary">0.00%</span></div><div class="two-line-number portfolio-shares"><strong class="cell-primary">${integer(account.repoShares || 0)}</strong></div><div class="two-line-number portfolio-cost-price"><div class="portfolio-cost-stack"><strong class="cell-primary">0.000</strong><span class="cell-primary">${price(account.repoPrice || 100, 3)}</span></div></div><div class="portfolio-next-cell"><span>逆回购</span><strong>到期回款</strong></div></div></article>`;
   }
 
   function renderHolding(holding) {
@@ -1187,7 +1191,7 @@
     return {
       dataRevision: DATA_REVISION,
       bankCash: numberOrNull(raw.bankCash),
-      accounts: (raw.accounts || []).map((item) => ({ id: String(item.id), label: String(item.label || ""), name: String(item.name || ""), availableCash: numberOrNull(item.availableCash) })),
+      accounts: (raw.accounts || []).map((item) => ({ id: String(item.id), label: String(item.label || ""), name: String(item.name || ""), availableCash: numberOrNull(item.availableCash), repoBalance: numberOrNull(item.repoBalance) || 0, repoShares: integerValue(item.repoShares), repoPrice: numberOrNull(item.repoPrice) || 100 })),
       holdings,
       positionLots: lots,
       plans,
@@ -1539,6 +1543,7 @@
   function getHolding(id) { return state.holdings.find((holding) => holding.id === id) || null; }
   function accountName(id) { return state.accounts.find((account) => account.id === id)?.name || ""; }
   function marketValue(holding) { return positive(holding.currentPrice) ? holding.currentPrice * (holding.shares || 0) : 0; }
+  function repoValue(account) { return Math.max(0, Number(account?.repoBalance) || 0); }
   function costAmount(holding) { return positive(holding.cost) ? holding.cost * (holding.shares || 0) : 0; }
   function floatingPnl(holding) { return marketValue(holding) - costAmount(holding) + (holding.floatingPnlAdjustment || 0); }
   function actualTradeProfit(plan) { return positive(plan.actualSellPrice) && positive(plan.actualBuyPrice) && positive(plan.actualTradeShares || plan.sellShares) ? (plan.actualSellPrice - plan.actualBuyPrice) * (plan.actualTradeShares || plan.sellShares) : null; }
