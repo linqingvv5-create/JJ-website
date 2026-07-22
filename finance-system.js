@@ -9,10 +9,10 @@
   const VIEW_TITLES = {
     overview: ["资金驾驶舱", "家庭资产、月度收入、资金分配与虚拟资金池"],
     ledger: ["家庭账本", "收入、支出、转账与资金划拨"],
-    accounts: ["账户", "真实账户与 Dream 基金明细"],
+    accounts: ["账户", "白白与胖胖的真实账户资产明细"],
     settings: ["资金设置", "成员、分类、标签、分配规则与 Dream 基金"],
     members: ["资金设置", "成员、分类、标签、分配规则与 Dream 基金"],
-    dreams: ["Dream花园", "每个目标都是正在养成的梦想动物"],
+    dreams: ["Dream花园", "梦想目标、Dream 基金与家庭公共账户"],
     investments: ["投资账户", "只读取账户资产摘要，不混入家庭账单"],
     reports: ["报表", "月报、年报和资产趋势"],
     mine: ["我的", "当前成员与常用个人入口"]
@@ -187,7 +187,7 @@
     els.pageSubtitle.textContent = subtitle;
     setActiveNav(currentView);
     updateModuleTabs(route.section, route.subtab);
-    if (els.quickAdd) els.quickAdd.hidden = !["overview", "ledger"].includes(currentView);
+    if (els.quickAdd) els.quickAdd.hidden = !["overview", "ledger", "dreams"].includes(currentView);
     if (updateHash) history.replaceState(null, "", route.path);
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -295,7 +295,7 @@
 
   function renderAccounts() {
     if (!window.FinanceAuth?.activeMemberId) {
-      els.content.innerHTML = `<div class="finance-page">${pageHead("账户", "请先进入自己的个人页")}${memberAccessPanel("选择你的个人账户", "输入个人密码后，只显示并管理你自己的真实资金账户。")}</div>`;
+      els.content.innerHTML = `<div class="finance-page">${pageHead("账户", "请先进入自己的个人页")}${memberAccessPanel("选择你的个人账户", "输入个人密码后，只显示并管理白白或胖胖自己的真实资金账户。")}</div>`;
       return;
     }
     const month = monthlyAccountFlows(ledgerMonth);
@@ -305,13 +305,10 @@
     const members = [white, pang].filter(Boolean);
     const isRealAccount = (item) => !item.isArchived && item.type !== "VIRTUAL_POOL";
     const accountsFor = (memberId) => state.accounts.filter((item) => isRealAccount(item) && item.ownerMemberId === memberId && !item.isShared);
-    const familyAccounts = state.accounts.filter((item) => isRealAccount(item) && (item.ownerMemberId === "family" || item.isShared));
-    const familyMember = { id: "family", displayName: "家庭公共" };
     els.content.innerHTML = `
       <div class="finance-page">
         ${pageHead("账户", `${me?.displayName || "当前成员"}已登录`, `<button class="finance-primary" data-add-account>＋ 添加账户</button>`)}
-        ${dreamFundDetails()}
-        <div class="member-account-sections">${members.map((member) => memberAccountSection(member, accountsFor(member.id), month, member.id === me?.id)).join("")}${memberAccountSection(familyMember, familyAccounts, month, true, false)}</div>
+        <div class="member-account-sections">${members.map((member) => memberAccountSection(member, accountsFor(member.id), month, member.id === me?.id)).join("")}</div>
       </div>`;
   }
 
@@ -393,12 +390,17 @@
   function renderDreams() {
     const investments = investmentSummaries();
     const goals = effectiveGoals(investments);
+    const month = monthlyAccountFlows(ledgerMonth);
     const white = state.members.find((item) => item.id === "member-me" || item.displayName.includes("白白")) || state.members[0];
     const pang = state.members.find((item) => item.id !== white?.id && item.isActive && item.displayName.includes("胖胖")) || state.members.find((item) => item.id !== white?.id && item.isActive);
+    const familyAccounts = state.accounts.filter((item) => !item.isArchived && item.type !== "VIRTUAL_POOL" && (item.ownerMemberId === "family" || item.isShared));
+    const familyMember = { id: "family", displayName: "家庭公共" };
     els.content.innerHTML = `
       <div class="finance-page">
-        ${pageHead("Dream花园", "", `<button class="finance-primary" data-add-goal>＋ 新建目标</button>`)}
+        ${pageHead("Dream花园", "", `<button class="overview-ledger-entry" data-open-view="ledger">账本</button><button class="overview-ledger-entry" data-open-view="accounts">账户</button><button class="finance-primary" data-add-goal>＋ 目标</button>`)}
         ${dreamGarden(goals, accountGardenAnimals(white, pang), false)}
+        ${dreamFundDetails()}
+        <div class="member-account-sections dream-family-accounts">${memberAccountSection(familyMember, familyAccounts, month, true, false)}</div>
       </div>`;
   }
 
