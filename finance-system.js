@@ -246,6 +246,7 @@
     els.content.innerHTML = `
       <div class="finance-page">
         ${pageHead("资金总览", "日常资金与投资资产分开记录、统一查看", `<button class="finance-primary" data-add-transaction>＋ 快速记账</button>`)}
+        ${window.FinanceAuth?.activeMemberId ? "" : memberAccessPanel("当前只显示家庭共享资产", "进入个人页后，才能查看该成员的银行卡、微信、支付宝等个人账户。")}
         <section class="finance-summary-grid">
           ${summaryCard("家庭净资产", money(assets.netAssets), "")}
           ${summaryCard("本月收入", money(monthly.income), "finance-income")}
@@ -303,6 +304,7 @@
     els.content.innerHTML = `
       <div class="finance-page">
         ${pageHead("账户", "信用卡消费算支出，还款只算账户转账", `<button class="finance-secondary" data-add-member>＋ 家庭成员</button><button class="finance-secondary" data-add-category>＋ 自定义分类</button><button class="finance-primary" data-add-account>＋ 添加账户</button>`)}
+        ${window.FinanceAuth?.activeMemberId ? "" : memberAccessPanel("个人账户尚未解锁", "请选择你的个人页；首次进入会让本人设置独立密码。")}
         <section class="finance-panel" style="margin:0 16px 18px">
           <div class="finance-panel-head"><strong>日常账户</strong><span>${state.accounts.filter((item) => !item.isArchived).length} 个</span></div>
           <div class="finance-account-list">${state.accounts.filter((item) => !item.isArchived).map((account) => accountRow(account, month[account.id], true)).join("")}</div>
@@ -322,6 +324,17 @@
   }
 
   function renderMine() {
+    if (!window.FinanceAuth?.activeMemberId) {
+      els.content.innerHTML = `
+        <div class="finance-page">
+          ${pageHead("我的", "进入个人页查看自己的账户与账目")}
+          ${memberAccessPanel("选择你的个人页", "首次进入请设置个人密码；以后使用该密码查看自己的资产。")}
+          <section class="finance-panel finance-mine-links" style="margin:0 16px 18px">
+            <button type="button" data-cloud-sign-out><span>退出整个系统</span><b>重新输入总密码 ›</b></button>
+          </section>
+        </div>`;
+      return;
+    }
     const me = state.members.find((item) => item.isCurrentUser) || state.members[0];
     const personalAccounts = state.accounts.filter((account) => account.ownerMemberId === me?.id && !account.isArchived);
     const personalTransactions = state.transactions.filter((item) => item.ownerMemberId === me?.id || item.payerMemberId === me?.id || item.bookkeeperMemberId === me?.id);
@@ -344,6 +357,17 @@
 
   function memberRows() {
     return state.members.filter((item) => item.isActive).map((member) => `<div class="finance-account-row"><div><span>${escapeHtml(member.role)}</span><strong>${escapeHtml(member.displayName)}${member.isCurrentUser ? " · 当前个人页" : ""}</strong></div><div><span>个人区域</span><strong>独立密码保护</strong></div><div><button type="button" class="finance-secondary" data-member-portal="${escapeAttribute(member.id)}">${member.isCurrentUser ? "已进入" : "进入个人页"}</button></div></div>`).join("");
+  }
+
+  function memberAccessPanel(title, description) {
+    const buttons = state.members.filter((item) => item.isActive).map((member) => `
+      <button type="button" data-member-portal="${escapeAttribute(member.id)}">
+        <span>${escapeHtml(member.displayName)}的个人页</span><b>设置或输入个人密码 ›</b>
+      </button>`).join("");
+    return `<section class="finance-panel" style="margin:0 16px 18px">
+      <div class="finance-panel-head"><div><strong>${escapeHtml(title)}</strong><br><span>${escapeHtml(description)}</span></div></div>
+      <div class="finance-mine-links">${buttons}</div>
+    </section>`;
   }
 
   function renderDreams() {
