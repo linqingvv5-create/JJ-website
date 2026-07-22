@@ -391,46 +391,79 @@ body.finance-mode #finance-system-view {
 .personal-account-actions button { min-height: 34px; padding: 0 11px; }
 
 .dream-garden { margin: 0 16px 18px; }
-.dream-garden-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 10px 14px; color: var(--finance-muted); font-size: 11px; }
-.dream-garden-canvas {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
-  padding: 14px;
-  background: linear-gradient(#f7fbff 0 56%, #f1f8e9 56% 100%);
-}
-.dream-garden-animal {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px 7px;
-  border: 1px solid rgba(181, 199, 170, .55);
-  border-radius: 14px;
-  background: rgba(255,255,255,.78);
-  text-align: center;
-}
-.dream-animal-visual {
+.dream-garden-scene {
   position: relative;
-  width: 76px;
-  height: 70px;
-  padding: 0;
+  height: clamp(430px, 56vw, 550px);
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(180deg, #dff4ff 0 37%, #dff2bd 37% 100%);
+}
+.dream-garden-scene::before {
+  position: absolute;
+  inset: 37% 0 0;
+  z-index: -3;
+  content: "";
+  background: radial-gradient(circle at 18% 30%, rgba(255,255,255,.28) 0 2px, transparent 3px), linear-gradient(165deg, transparent 48%, rgba(126,174,85,.17) 49% 51%, transparent 52%);
+  background-size: 31px 31px, 100% 100%;
+}
+.dream-sun { position: absolute; top: 7%; left: 7%; color: #ffd45f; font-size: 42px; filter: drop-shadow(0 4px 8px rgba(255,190,45,.25)); }
+.dream-cloud { position: absolute; z-index: -1; color: rgba(255,255,255,.88); font-size: 48px; }
+.dream-cloud-one { top: 2%; left: 31%; }
+.dream-cloud-two { top: 12%; right: 9%; font-size: 39px; }
+.dream-tree { position: absolute; z-index: -1; font-size: 78px; filter: drop-shadow(0 8px 5px rgba(68,100,35,.18)); }
+.dream-tree-one { top: 26%; left: 2%; }
+.dream-tree-two { top: 28%; right: 3%; }
+.dream-pond { position: absolute; right: 8%; bottom: 5%; z-index: -2; width: 30%; height: 24%; border: 5px solid rgba(255,255,255,.45); border-radius: 50%; background: radial-gradient(ellipse at 42% 35%, #b8eff4 0 28%, #77cedb 65%, #55b6c7 100%); box-shadow: inset 0 0 0 7px rgba(95,164,76,.16); transform: rotate(-5deg); }
+.dream-path { position: absolute; left: 35%; bottom: -20%; z-index: -2; width: 25%; height: 88%; border-radius: 50%; background: linear-gradient(90deg, #d8bd8e, #f0d9ae 48%, #d0ae78); transform: rotate(12deg); opacity: .78; }
+.dream-fence { position: absolute; right: -1%; top: 37%; z-index: -1; width: 36%; overflow: hidden; color: #d5a763; font-size: 28px; font-weight: 900; letter-spacing: 4px; white-space: nowrap; transform: rotate(-2deg); text-shadow: 0 2px #fff0c6; }
+.dream-scene-animal {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 180px;
+  padding: 3px;
   border: 0;
+  color: var(--finance-ink);
   background: transparent;
   cursor: pointer;
+  text-align: left;
+  transform: translate(-50%, -50%);
+}
+.dream-scene-animal:hover .dream-animal-visual,
+.dream-scene-animal:focus-visible .dream-animal-visual { transform: translateY(-3px) scale(1.04); }
+.dream-animal-visual {
+  position: relative;
+  width: 72px;
+  height: 66px;
+  flex: 0 0 72px;
+  transition: transform .2s ease;
 }
 .dream-animal-base,
 .dream-animal-fill { position: absolute; inset: 0; display: grid; place-items: center; font-size: 54px; }
-.dream-animal-base { opacity: .18; filter: grayscale(1); }
+.dream-animal-base { opacity: .32; filter: grayscale(1); }
 .dream-animal-fill { clip-path: inset(calc(100% - var(--fill)) 0 0); transition: clip-path .25s ease; }
-.dream-garden-animal > strong { max-width: 100%; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.dream-garden-animal > span,
-.dream-garden-animal > small { margin-top: 3px; color: var(--finance-muted); font-size: 9px; }
-.dream-garden-animal > small { font-weight: 700; }
-.dream-garden-animal > div { display: flex; gap: 5px; margin-top: 8px; }
-.dream-garden-animal > div button,
-.dream-egg-button { padding: 5px 7px; border: 1px solid var(--finance-line); border-radius: 7px; color: var(--finance-ink); background: #fff; font-size: 10px; cursor: pointer; }
-.dream-egg-button { margin-top: 6px; color: #9b6b00; background: #fff8d8; }
+.dream-scene-label { display: grid; min-width: 76px; padding: 6px 7px; border: 1px solid rgba(255,255,255,.78); border-radius: 10px; background: rgba(255,255,255,.82); box-shadow: 0 4px 12px rgba(53,82,38,.1); backdrop-filter: blur(5px); }
+.dream-scene-label strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.dream-scene-label span { color: #4c8d36; font-size: 10px; font-weight: 800; }
+.dream-scene-label small { color: #9b6b00; font-size: 9px; font-weight: 700; white-space: nowrap; }
+.dream-detail-content { display: grid; gap: 14px; }
+.dream-detail-hero { display: flex; align-items: center; gap: 18px; padding: 14px; border-radius: 16px; background: linear-gradient(135deg, #f4fae9, #eaf7ff); }
+.dream-detail-hero .dream-animal-visual { width: 92px; height: 84px; flex-basis: 92px; }
+.dream-detail-hero .dream-animal-base,
+.dream-detail-hero .dream-animal-fill { font-size: 70px; }
+.dream-detail-hero > div:last-child { display: grid; gap: 5px; color: var(--finance-muted); }
+.dream-detail-hero > div:last-child strong { color: #4c8d36; font-size: 27px; }
+.dream-detail-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.dream-detail-stats div { padding: 11px; border-radius: 10px; background: var(--finance-soft); }
+.dream-detail-stats dt { color: var(--finance-muted); font-size: 11px; }
+.dream-detail-stats dd { margin: 5px 0 0; font-size: 14px; font-weight: 800; }
+.dream-detail-egg { min-height: 42px; border: 1px solid #f1d688; border-radius: 10px; color: #8b6200; background: #fff8d8; font-weight: 700; cursor: pointer; }
+.dream-detail-actions { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; }
+.dream-detail-actions button { min-height: 42px; }
 .member-account-sections { display: grid; gap: 10px; padding: 0 16px 18px; }
 .member-account-section { margin: 0; }
 .member-account-lock { color: var(--finance-muted); font-size: 12px; }
@@ -523,9 +556,19 @@ body.finance-mode #finance-system-view {
   .personal-account-card { padding: 12px; }
   .personal-account-balance { font-size: 17px; }
   .dream-garden { margin: 0 8px 12px; }
-  .dream-garden-canvas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; padding: 9px; }
-  .dream-animal-visual { width: 64px; height: 60px; }
-  .dream-animal-base, .dream-animal-fill { font-size: 46px; }
+  .dream-garden .finance-panel-head span { display: none; }
+  .dream-garden-scene { height: min(500px, calc(100svh - 175px)); min-height: 430px; }
+  .dream-sun { font-size: 32px; }
+  .dream-cloud { font-size: 36px; }
+  .dream-tree { font-size: 57px; }
+  .dream-fence { font-size: 21px; }
+  .dream-scene-animal { gap: 2px; max-width: 118px; }
+  .dream-animal-visual { width: 48px; height: 46px; flex-basis: 48px; }
+  .dream-animal-base, .dream-animal-fill { font-size: 39px; }
+  .dream-scene-label { min-width: 61px; padding: 4px 5px; }
+  .dream-scene-label strong { font-size: 9px; }
+  .dream-scene-label span { font-size: 9px; }
+  .dream-scene-label small { font-size: 8px; }
   .member-account-sections { gap: 8px; padding: 0 8px 12px; }
   .member-account-head { display: none; }
   .member-account-row { grid-template-columns: 1fr auto; gap: 8px; padding: 11px; }
@@ -946,6 +989,19 @@ body.finance-mode #finance-system-view {
   background: #fff;
   border-radius: 14px;
   box-shadow: 0 22px 70px rgba(0, 0, 0, .22);
+}
+.finance-modal-backdrop.is-dream-detail { place-items: center; }
+.finance-modal.dream-detail-sheet { width: min(520px, 100%); }
+
+@media (max-width: 680px) {
+  .finance-modal-backdrop.is-dream-detail { place-items: end center; padding: 0; }
+  .finance-modal.dream-detail-sheet {
+    width: 100%;
+    max-width: none;
+    max-height: 86svh;
+    border-radius: 22px 22px 0 0;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
 }
 
 .finance-modal-head {
