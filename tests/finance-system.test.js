@@ -124,6 +124,11 @@ assert.deepEqual(
   { section: "investment", subtab: "holdings", view: "", path: "#/investment/holdings" },
   "投资模块使用二级路由"
 );
+assert.deepEqual(
+  JSON.parse(JSON.stringify(api.parseRoute("#/reports"))),
+  { section: "funds", subtab: "ledger", view: "ledger", path: "#/funds/ledger", ledgerPanel: "reports" },
+  "旧报表链接自动进入账本报表"
+);
 assert.equal(api.routeForView("overview").path, "#/funds/overview");
 assert.equal(api.routeForView("investments").path, "#/investment/accounts");
 console.log("finance system scenarios A/B/C passed");

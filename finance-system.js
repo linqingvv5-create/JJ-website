@@ -59,6 +59,7 @@
   let ledgerType = "ALL";
   let ledgerSortKey = "occurredAt";
   let ledgerSortDirection = "desc";
+  let ledgerPanel = "entries";
   let syncText = "正在读取云端保存…";
   let saveTimer = 0;
   let toastTimer = 0;
@@ -160,16 +161,18 @@
     if (section === "funds") openFinanceView(navPreference.funds || "overview");
     else if (section === "investment") openInvestmentTab(navPreference.investment || "accounts");
     else if (section === "dreams") openFinanceView("dreams");
-    else if (section === "reports") openFinanceView("reports");
+    else if (section === "reports") { ledgerPanel = "reports"; openFinanceView("ledger"); }
     else openFinanceView("mine");
   }
 
   function navigateRoute(route, updateHash = true) {
+    if (route.ledgerPanel) ledgerPanel = route.ledgerPanel;
     if (route.section === "investment" && route.subtab !== "accounts") openInvestmentTab(route.subtab, updateHash);
     else openFinanceView(route.view, updateHash);
   }
 
   function openFinanceView(view, updateHash = true) {
+    if (view === "reports") { ledgerPanel = "reports"; view = "ledger"; }
     currentView = VIEW_TITLES[view] ? view : "overview";
     const route = routeForView(currentView);
     if (route.section === "funds") rememberSubtab("funds", route.subtab);
@@ -231,7 +234,6 @@
     else if (currentView === "members") renderMembers();
     else if (currentView === "dreams") renderDreams();
     else if (currentView === "investments") renderInvestments();
-    else if (currentView === "reports") renderReports();
     else if (currentView === "mine") renderMine();
     else renderOverview();
   }
@@ -279,23 +281,32 @@
 
   function renderLedger() {
     const rows = filteredTransactions();
+    const actions = ledgerPanel === "reports"
+      ? `<input type="month" class="finance-secondary" data-report-month value="${escapeAttribute(ledgerMonth)}">`
+      : `<button class="finance-secondary" data-export-csv>导出 CSV</button><button class="finance-secondary" data-import-csv>导入 CSV</button><input type="file" accept=".csv,text/csv" data-csv-file hidden><button class="finance-primary" data-add-transaction>＋ 记一笔</button>`;
+    const entries = `
+      <div class="finance-filters">
+        ${scopeChip("me", "我的账本")}${state.members.filter((item) => !item.isCurrentUser && item.isActive).map((item) => scopeChip(`member:${item.id}`, `${item.displayName}账本`)).join("")}${scopeChip("family", "家庭账本")}
+        <input type="month" data-ledger-month value="${escapeAttribute(ledgerMonth)}">
+        <select data-ledger-type><option value="ALL">全部类型</option>${optionList([["INCOME","收入"],["EXPENSE","支出"],["TRANSFER","转账"],["REFUND","退款"],["REIMBURSEMENT","报销"],["BALANCE_ADJUSTMENT","余额调整"]], ledgerType)}</select>
+        <input type="search" data-ledger-search value="${escapeAttribute(ledgerSearch)}" placeholder="搜索分类、账户、商家或备注">
+      </div>
+      <div class="finance-table-wrap">
+        <table class="finance-table">
+          <thead><tr><th><button data-ledger-sort="occurredAt">日期时间 ${sortMark("occurredAt")}</button></th><th><button data-ledger-sort="amountCents">金额 ${sortMark("amountCents")}</button></th><th><button data-ledger-sort="type">类型 ${sortMark("type")}</button></th><th>一级分类</th><th>二级分类</th><th>支出账户</th><th>收入账户</th><th>记账人</th><th>实际付款人</th><th>个人或家庭</th><th>是否共享</th><th>鹅鸭鸡目标</th><th>商家</th><th>备注</th></tr></thead>
+          <tbody>${rows.map(transactionTableRow).join("")}</tbody>
+        </table>
+        ${rows.length ? "" : empty("当前筛选条件下没有账目。")}
+      </div>
+      <div class="finance-mobile-ledger">${rows.length ? rows.map(transactionCard).join("") : empty("当前筛选条件下没有账目。")}</div>`;
     els.content.innerHTML = `
       <div class="finance-page">
-        ${pageHead("家庭账本", "表格可搜索、筛选、按月查看，备注可直接编辑", `<button class="finance-secondary" data-export-csv>导出 CSV</button><button class="finance-secondary" data-import-csv>导入 CSV</button><input type="file" accept=".csv,text/csv" data-csv-file hidden><button class="finance-primary" data-add-transaction>＋ 记一笔</button>`)}
-        <div class="finance-filters">
-          ${scopeChip("me", "我的账本")}${state.members.filter((item) => !item.isCurrentUser && item.isActive).map((item) => scopeChip(`member:${item.id}`, `${item.displayName}账本`)).join("")}${scopeChip("family", "家庭账本")}
-          <input type="month" data-ledger-month value="${escapeAttribute(ledgerMonth)}">
-          <select data-ledger-type><option value="ALL">全部类型</option>${optionList([["INCOME","收入"],["EXPENSE","支出"],["TRANSFER","转账"],["REFUND","退款"],["REIMBURSEMENT","报销"],["BALANCE_ADJUSTMENT","余额调整"]], ledgerType)}</select>
-          <input type="search" data-ledger-search value="${escapeAttribute(ledgerSearch)}" placeholder="搜索分类、账户、商家或备注">
+        ${pageHead("家庭账本", ledgerPanel === "reports" ? "月报、年度趋势和家庭资产摘要" : "表格可搜索、筛选、按月查看，备注可直接编辑", actions)}
+        <div class="finance-ledger-switch" role="tablist" aria-label="账本内容">
+          <button type="button" role="tab" aria-selected="${ledgerPanel === "entries"}" class="${ledgerPanel === "entries" ? "is-active" : ""}" data-ledger-panel="entries">明细</button>
+          <button type="button" role="tab" aria-selected="${ledgerPanel === "reports"}" class="${ledgerPanel === "reports" ? "is-active" : ""}" data-ledger-panel="reports">报表</button>
         </div>
-        <div class="finance-table-wrap">
-          <table class="finance-table">
-            <thead><tr><th><button data-ledger-sort="occurredAt">日期时间 ${sortMark("occurredAt")}</button></th><th><button data-ledger-sort="amountCents">金额 ${sortMark("amountCents")}</button></th><th><button data-ledger-sort="type">类型 ${sortMark("type")}</button></th><th>一级分类</th><th>二级分类</th><th>支出账户</th><th>收入账户</th><th>记账人</th><th>实际付款人</th><th>个人或家庭</th><th>是否共享</th><th>鹅鸭鸡目标</th><th>商家</th><th>备注</th></tr></thead>
-            <tbody>${rows.map(transactionTableRow).join("")}</tbody>
-          </table>
-          ${rows.length ? "" : empty("当前筛选条件下没有账目。")}
-        </div>
-        <div class="finance-mobile-ledger">${rows.length ? rows.map(transactionCard).join("") : empty("当前筛选条件下没有账目。")}</div>
+        ${ledgerPanel === "reports" ? reportContent() : entries}
       </div>`;
   }
 
@@ -402,15 +413,13 @@
       </div>`;
   }
 
-  function renderReports() {
+  function reportContent() {
     const months = lastMonths(12).map((month) => ({ month, ...monthlySummary(month) }));
     const current = monthlySummary(ledgerMonth);
     const max = Math.max(1, ...months.flatMap((item) => [item.income, item.expense]));
     const required = categoryExpense(current.transactions, "expense-required");
     const optional = categoryExpense(current.transactions, "expense-optional");
-    els.content.innerHTML = `
-      <div class="finance-page">
-        ${pageHead("报表", "月报、年度趋势和家庭资产摘要", `<input type="month" class="finance-secondary" data-report-month value="${escapeAttribute(ledgerMonth)}">`)}
+    return `
         <section class="finance-summary-grid">
           ${summaryCard("本月收入", money(current.income), "finance-income")}${summaryCard("本月支出", money(current.expense), "finance-expense")}
           ${summaryCard("必须支出", money(required), "")}${summaryCard("非必须支出", money(optional), "")}
@@ -428,14 +437,20 @@
             <div class="finance-panel-head"><strong>资产报表</strong><span>日常账户 + 投资摘要</span></div>
             <div class="finance-account-list">${state.assetSnapshots.slice(0, 6).map((item) => `<div class="finance-account-row"><div><span>${escapeHtml(item.snapshotDate)}</span><strong>家庭净资产</strong></div><div><span>资产</span><strong>${money(item.assetCents)}</strong></div><div><span>负债</span><strong>${money(item.liabilityCents)}</strong></div><div><span>净资产</span><strong>${money(item.netAssetCents)}</strong></div></div>`).join("") || empty("保存一笔账后生成资产快照。")}</div>
           </section>
-        </div>
-      </div>`;
+        </div>`;
+  }
+
+  function renderReports() {
+    ledgerPanel = "reports";
+    openFinanceView("ledger");
   }
 
   function handleContentClick(event) {
     const open = event.target.closest("[data-open-view]");
     if (open) { openFinanceView(open.dataset.openView); return; }
     if (event.target.closest("[data-add-transaction]")) { openTransactionModal(); return; }
+    const ledgerPanelButton = event.target.closest("[data-ledger-panel]");
+    if (ledgerPanelButton) { ledgerPanel = ledgerPanelButton.dataset.ledgerPanel === "reports" ? "reports" : "entries"; renderLedger(); return; }
     if (event.target.closest("[data-add-member]")) { openMemberModal(); return; }
     const memberPortal = event.target.closest("[data-member-portal]");
     if (memberPortal) { void openMemberPortal(memberPortal.dataset.memberPortal); return; }
@@ -488,7 +503,7 @@
   function handleContentChange(event) {
     if (event.target.matches("[data-ledger-month]")) { ledgerMonth = event.target.value || monthKey(new Date()); renderLedger(); }
     if (event.target.matches("[data-ledger-type]")) { ledgerType = event.target.value; renderLedger(); }
-    if (event.target.matches("[data-report-month]")) { ledgerMonth = event.target.value || monthKey(new Date()); renderReports(); }
+    if (event.target.matches("[data-report-month]")) { ledgerMonth = event.target.value || monthKey(new Date()); renderLedger(); }
     if (event.target.matches("[data-csv-file]")) void importCsv(event.target.files?.[0]);
   }
 
@@ -1269,7 +1284,8 @@
       const tab = INVESTMENT_TABS.some(([key]) => key === subtab) ? subtab : navPreference.investment || "accounts";
       return { section: "investment", subtab: tab, view: tab === "accounts" ? "investments" : "", path: `#/investment/${tab}` };
     }
-    if (["dreams", "reports", "mine"].includes(section)) return { section, subtab: "", view: section, path: `#/${section}` };
+    if (section === "reports") return { section: "funds", subtab: "ledger", view: "ledger", path: "#/funds/ledger", ledgerPanel: "reports" };
+    if (["dreams", "mine"].includes(section)) return { section, subtab: "", view: section, path: `#/${section}` };
     const legacy = { overview: ["funds", "overview"], ledger: ["funds", "ledger"], accounts: ["funds", "accounts"], members: ["funds", "members"], investments: ["investment", "accounts"], holdings: ["investment", "holdings"], plans: ["investment", "plans"] }[section];
     if (legacy) return legacy[0] === "funds" ? { section: "funds", subtab: legacy[1], view: legacy[1], path: `#/funds/${legacy[1]}` } : { section: "investment", subtab: legacy[1], view: legacy[1] === "accounts" ? "investments" : "", path: `#/investment/${legacy[1]}` };
     const tab = navPreference.funds || "overview";
