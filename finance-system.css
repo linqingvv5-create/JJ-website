@@ -410,8 +410,13 @@ body.finance-mode #finance-system-view {
 .dream-fund-category-head small { color: var(--finance-muted); font-size: 10px; }
 .dream-fund-category-head b { color: #2f6ca8; font-size: 16px; white-space: nowrap; }
 .dream-fund-category.is-short .dream-fund-category-head b { color: #3f8b61; }
+.dream-fund-flow-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--finance-line); background: #fffdfa; }
+.dream-fund-flow-summary span { display: grid; gap: 3px; padding: 8px 10px; color: var(--finance-muted); border-left: 1px solid var(--finance-line); font-size: 9px; }
+.dream-fund-flow-summary span:first-child { border-left: 0; }
+.dream-fund-flow-summary b { color: var(--finance-ink); font-size: 10px; white-space: nowrap; }
 .dream-fund-purpose-list { display: grid; }
-.dream-fund-purpose-list > button {
+.dream-fund-purpose-item { display: grid; grid-template-columns: minmax(0, 1fr) 38px; border-top: 1px solid var(--finance-line); }
+.dream-fund-purpose-item > button:first-child {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr) auto;
   align-items: center;
@@ -419,17 +424,18 @@ body.finance-mode #finance-system-view {
   min-width: 0;
   padding: 11px 14px;
   border: 0;
-  border-top: 1px solid var(--finance-line);
   color: var(--finance-ink);
   background: #fff;
   text-align: left;
   cursor: pointer;
 }
-.dream-fund-purpose-list > button:hover { background: var(--finance-soft); }
+.dream-fund-purpose-item > button:first-child:hover { background: var(--finance-soft); }
+.dream-fund-purpose-menu { border: 0; border-left: 1px solid var(--finance-line); color: var(--finance-muted); background: #fff; font-size: 20px; cursor: pointer; }
+.dream-fund-purpose-menu:hover { color: var(--finance-ink); background: var(--finance-soft); }
 .dream-fund-purpose-icon { font-size: 23px; text-align: center; }
-.dream-fund-purpose-list > button > span:nth-child(2),
+.dream-fund-purpose-item > button:first-child > span:nth-child(2),
 .dream-fund-purpose-value { display: grid; min-width: 0; gap: 2px; }
-.dream-fund-purpose-list > button > span:nth-child(2) small { overflow: hidden; color: var(--finance-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.dream-fund-purpose-item > button:first-child > span:nth-child(2) small { overflow: hidden; color: var(--finance-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .dream-fund-purpose-value { text-align: right; }
 .dream-fund-purpose-value b { font-size: 12px; white-space: nowrap; }
 .dream-fund-purpose-value small { color: var(--finance-muted); font-size: 9px; }
@@ -472,6 +478,8 @@ body.finance-mode #finance-system-view {
   color: var(--finance-ink);
   background: transparent;
   cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
   text-align: left;
   transform: translate(-50%, -50%);
 }
@@ -504,8 +512,11 @@ body.finance-mode #finance-system-view {
 .dream-detail-stats dt { color: var(--finance-muted); font-size: 11px; }
 .dream-detail-stats dd { margin: 5px 0 0; font-size: 14px; font-weight: 800; }
 .dream-detail-egg { min-height: 42px; border: 1px solid #f1d688; border-radius: 10px; color: #8b6200; background: #fff8d8; font-weight: 700; cursor: pointer; }
-.dream-detail-actions { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; }
+.dream-detail-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; }
 .dream-detail-actions button { min-height: 42px; }
+.dream-animal-menu { display: grid; gap: 9px; padding: 16px; }
+.dream-animal-menu button { min-height: 44px; }
+.dream-animal-menu small { color: var(--finance-muted); font-size: 10px; line-height: 1.6; text-align: center; }
 .member-account-sections { display: grid; gap: 10px; padding: 0 16px 18px; }
 .member-account-section { margin: 0; }
 .member-account-lock { color: var(--finance-muted); font-size: 12px; }
@@ -605,7 +616,9 @@ body.finance-mode #finance-system-view {
   .dream-fund-category { border-top: 1px solid var(--finance-line); border-left: 0; }
   .dream-fund-category:first-child { border-top: 0; }
   .dream-fund-category-head { padding: 11px 12px; }
-  .dream-fund-purpose-list > button { grid-template-columns: 28px minmax(0, 1fr) auto; gap: 7px; padding: 10px 11px; }
+  .dream-fund-flow-summary span { padding: 7px 6px; }
+  .dream-fund-purpose-item { grid-template-columns: minmax(0, 1fr) 36px; }
+  .dream-fund-purpose-item > button:first-child { grid-template-columns: 28px minmax(0, 1fr) auto; gap: 7px; padding: 10px 11px; }
   .dream-fund-purpose-icon { font-size: 20px; }
   .dream-garden { margin: 0 8px 12px; }
   .dream-garden .finance-panel-head span { display: none; }
@@ -1080,6 +1093,8 @@ body.finance-mode #finance-system-view {
 
 .finance-form label { display: grid; gap: 6px; color: #606979; font-size: 12px; }
 .finance-form label.is-wide { grid-column: 1 / -1; }
+.finance-field-help { display: block; margin-top: -1px; color: var(--finance-muted); font-size: 10px; line-height: 1.45; }
+.finance-field-note { margin: 0; padding: 10px 12px; color: #48627a; border-radius: 9px; background: #f0f7ff; font-size: 11px; line-height: 1.55; }
 .finance-form input,
 .finance-form select,
 .finance-form textarea {
