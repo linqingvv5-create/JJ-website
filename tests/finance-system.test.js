@@ -133,5 +133,5 @@ assert.deepEqual(
   "旧报表链接自动进入账本报表"
 );
 assert.equal(api.routeForView("overview").path, "#/funds/overview");
-assert.equal(api.routeForView("investments").path, "#/investment/accounts");
+assert.equal(api.routeForView("investments").path, "#/investment/holdings");
 console.log("finance system scenarios A/B/C passed");

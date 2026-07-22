@@ -56,7 +56,7 @@ const CANONICAL_FINANCE_LABELS = {
   },
   animals: { "animal-big-goose": "大鹅", "animal-small-goose": "小鹅", "animal-house-duck": "买房鸭", "animal-travel-chicken": "旅游鸡" },
   goals: { "goal-big-goose": "大鹅", "goal-small-goose": "小鹅", "goal-house-duck": "买房鸭", "goal-travel-chicken": "旅游鸡" },
-  investments: { "investment-self": "梦想号", "investment-family": "私募号" }
+  investments: { "investment-self": "华福证券（**1348）", "investment-family": "兴业证券（**7977）" }
 };
 const REMOVED_MEMBER_IDS = new Set(["member-partner"]);
 
