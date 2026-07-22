@@ -34,6 +34,60 @@ const ALLOWED_ORIGINS = new Set([
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const encoder = new TextEncoder();
 
+const CANONICAL_FINANCE_LABELS = {
+  members: {
+    "member-me": { displayName: "我", role: "本人" },
+    "member-partner": { displayName: "家人", role: "家庭成员" }
+  },
+  accounts: {
+    "account-bank": "银行卡", "account-wechat": "微信", "account-alipay": "支付宝",
+    "account-cash": "现金", "account-family": "家庭公共账户", "account-credit": "信用卡"
+  },
+  categories: {
+    "income-salary": "工资", "income-bonus": "奖金", "income-parents": "父母给予", "income-windfall": "意外之财",
+    "income-book": "写书收入", "income-up": "UP主收入", "income-dividend": "投资分红", "income-interest": "利息",
+    "income-refund": "退款", "income-other": "其他收入", "expense-required": "生活必须支出", "expense-food": "餐饮",
+    "expense-home": "居住", "expense-utilities": "水电燃气", "expense-phone": "通讯", "expense-commute": "通勤",
+    "expense-medical": "医疗", "expense-insurance": "基础保险", "expense-daily": "日用品", "expense-pet": "宠物基础支出",
+    "expense-optional": "生活非必须支出", "expense-dining": "外食", "expense-fun": "娱乐", "expense-clothes": "服装",
+    "expense-skincare": "护肤", "expense-makeup": "化妆", "expense-digital": "数码", "expense-hobby": "兴趣",
+    "expense-social": "社交", "expense-travel": "旅行", "expense-shopping": "非必要购物", "expense-dream": "梦想计划支出",
+    "expense-invest": "投资相关费用", "expense-other": "其他支出"
+  },
+  animals: { "animal-big-goose": "大鹅", "animal-small-goose": "小鹅", "animal-house-duck": "买房鸭", "animal-travel-chicken": "旅游鸡" },
+  goals: { "goal-big-goose": "大鹅", "goal-small-goose": "小鹅", "goal-house-duck": "买房鸭", "goal-travel-chicken": "旅游鸡" },
+  investments: { "investment-self": "梦想号", "investment-family": "私募号" }
+};
+
+function corruptedLabel(value) {
+  return !String(value || "").trim() || String(value).includes("?");
+}
+
+function canonicalizeFinanceState(state) {
+  if (!state || typeof state !== "object" || Array.isArray(state)) return state;
+  const repairName = (items, labels) => (Array.isArray(items) ? items : []).map((item) => {
+    const label = labels[item?.id];
+    return label && corruptedLabel(item?.name) ? { ...item, name: label } : item;
+  });
+  return {
+    ...state,
+    members: (Array.isArray(state.members) ? state.members : []).map((item) => {
+      const label = CANONICAL_FINANCE_LABELS.members[item?.id];
+      if (!label) return item;
+      return {
+        ...item,
+        displayName: corruptedLabel(item.displayName) ? label.displayName : item.displayName,
+        role: corruptedLabel(item.role) ? label.role : item.role
+      };
+    }),
+    accounts: repairName(state.accounts, CANONICAL_FINANCE_LABELS.accounts),
+    categories: repairName(state.categories, CANONICAL_FINANCE_LABELS.categories),
+    dreamAnimals: repairName(state.dreamAnimals, CANONICAL_FINANCE_LABELS.animals),
+    goals: repairName(state.goals, CANONICAL_FINANCE_LABELS.goals),
+    investmentSummaries: repairName(state.investmentSummaries, CANONICAL_FINANCE_LABELS.investments)
+  };
+}
+
 function bytesEqual(left, right) {
   if (left.length !== right.length) return false;
   let difference = 0;
@@ -288,7 +342,7 @@ async function readFinanceState(db, memberId = null, includeAll = false) {
   ]);
   const accountBodies = parseBodies(accounts);
   const transactionBodies = parseBodies(transactions);
-  return { activeMemberId: includeAll ? null : memberId, state: { version: 1, updatedAt: updated?.results?.[0]?.value || null, members: parseBodies(members), accounts: includeAll ? accountBodies : accountBodies.filter((item) => visibleToMember(item, memberId)), categories: parseBodies(categories), transactions: includeAll ? transactionBodies : transactionBodies.filter((item) => visibleToMember(item, memberId)), dreamAnimals: parseBodies(animals), goals: parseBodies(goals), goalEntries: parseBodies(goalEntries), assetSnapshots: parseBodies(snapshots), investmentSummaries: parseBodies(investments) } };
+  return { activeMemberId: includeAll ? null : memberId, state: canonicalizeFinanceState({ version: 1, updatedAt: updated?.results?.[0]?.value || null, members: parseBodies(members), accounts: includeAll ? accountBodies : accountBodies.filter((item) => visibleToMember(item, memberId)), categories: parseBodies(categories), transactions: includeAll ? transactionBodies : transactionBodies.filter((item) => visibleToMember(item, memberId)), dreamAnimals: parseBodies(animals), goals: parseBodies(goals), goalEntries: parseBodies(goalEntries), assetSnapshots: parseBodies(snapshots), investmentSummaries: parseBodies(investments) }) };
 }
 
 function requireArray(state, key) {
@@ -302,7 +356,7 @@ function safeText(value, fallback = "") {
 
 async function writeFinanceState(request, db, memberId = null) {
   const payload = await request.json();
-  const state = payload?.state;
+  const state = canonicalizeFinanceState(payload?.state);
   if (!state || typeof state !== "object" || Array.isArray(state)) return json({ error: "state must be an object" }, 400, request);
   const members = requireArray(state, "members");
   let accounts = requireArray(state, "accounts");

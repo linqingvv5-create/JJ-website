@@ -1091,14 +1091,28 @@
 
   function normalizeState(raw) {
     const fallback = defaultState();
-    const dreamAnimals = Array.isArray(raw.dreamAnimals) && raw.dreamAnimals.length ? raw.dreamAnimals : fallback.dreamAnimals;
-    const goals = (Array.isArray(raw.goals) && raw.goals.length ? raw.goals : fallback.goals).map((goal, index) => ({ ...goal, animalId: goal.animalId || dreamAnimals.find((animal) => animal.name === goal.name && animal.kind === goal.kind)?.id || dreamAnimals[index]?.id || "" }));
+    const repairNames = (items, defaults) => {
+      const names = new Map(defaults.map((item) => [item.id, item.name]));
+      return items.map((item) => names.has(item.id) && String(item.name || "").includes("?") ? { ...item, name: names.get(item.id) } : item);
+    };
+    const fallbackMembers = new Map(fallback.members.map((item) => [item.id, item]));
+    const members = (Array.isArray(raw.members) && raw.members.length ? raw.members : fallback.members).map((item) => {
+      const known = fallbackMembers.get(item.id);
+      if (!known) return item;
+      return {
+        ...item,
+        displayName: String(item.displayName || "").includes("?") ? known.displayName : item.displayName,
+        role: String(item.role || "").includes("?") ? known.role : item.role
+      };
+    });
+    const dreamAnimals = repairNames(Array.isArray(raw.dreamAnimals) && raw.dreamAnimals.length ? raw.dreamAnimals : fallback.dreamAnimals, fallback.dreamAnimals);
+    const goals = repairNames(Array.isArray(raw.goals) && raw.goals.length ? raw.goals : fallback.goals, fallback.goals).map((goal, index) => ({ ...goal, animalId: goal.animalId || dreamAnimals.find((animal) => animal.name === goal.name && animal.kind === goal.kind)?.id || dreamAnimals[index]?.id || "" }));
     return {
       version: 1,
       updatedAt: String(raw.updatedAt || new Date().toISOString()),
-      members: Array.isArray(raw.members) && raw.members.length ? raw.members : fallback.members,
-      categories: (Array.isArray(raw.categories) && raw.categories.length ? raw.categories : fallback.categories).map((category) => category.id === "expense-food" ? { ...category, name: "餐饮" } : category),
-      accounts: Array.isArray(raw.accounts) ? raw.accounts : fallback.accounts,
+      members,
+      categories: repairNames(Array.isArray(raw.categories) && raw.categories.length ? raw.categories : fallback.categories, fallback.categories),
+      accounts: repairNames(Array.isArray(raw.accounts) ? raw.accounts : fallback.accounts, fallback.accounts),
       transactions: Array.isArray(raw.transactions) ? raw.transactions : [],
       dreamAnimals,
       goals,
