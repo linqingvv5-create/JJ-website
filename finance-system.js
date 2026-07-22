@@ -9,10 +9,10 @@
   const VIEW_TITLES = {
     overview: ["资金驾驶舱", "家庭资产、月度收入、资金分配与虚拟资金池"],
     ledger: ["家庭账本", "收入、支出、转账与资金划拨"],
-    accounts: ["我的账户", "个人资金账户与 Dream 愿望"],
+    accounts: ["账户", "真实账户与 Dream 基金明细"],
     settings: ["资金设置", "成员、分类、标签、分配规则与 Dream 基金"],
     members: ["资金设置", "成员、分类、标签、分配规则与 Dream 基金"],
-    dreams: ["鹅鸭鸡", "长期积累、中期目标和短期愿望"],
+    dreams: ["Dream花园", "每个目标都是正在养成的梦想动物"],
     investments: ["投资账户", "只读取账户资产摘要，不混入家庭账单"],
     reports: ["报表", "月报、年报和资产趋势"],
     mine: ["我的", "当前成员与常用个人入口"]
@@ -161,7 +161,7 @@
   }
 
   function openPrimarySection(section) {
-    if (["overview", "ledger", "accounts", "settings"].includes(section)) openFinanceView(section);
+    if (["overview", "ledger", "accounts", "settings", "dreams"].includes(section)) openFinanceView(section);
     else if (section === "investment") openInvestmentTab("holdings");
     else if (section === "funds") openFinanceView(navPreference.funds || "overview");
     else openFinanceView("overview");
@@ -247,7 +247,7 @@
     const cockpit = cockpitSummary(monthly, investments);
     els.content.innerHTML = `
       <div class="finance-page">
-        ${pageHead("家庭资金总览", "", `<button class="overview-ledger-entry" data-open-view="ledger">账本</button><button class="finance-primary overview-account-entry" data-open-view="accounts">我的账户</button><input type="month" class="finance-secondary" data-dashboard-month value="${escapeAttribute(ledgerMonth)}">`)}
+        ${pageHead("家庭资金总览", "", `<button class="overview-ledger-entry" data-open-view="ledger">账本</button><button class="finance-primary overview-account-entry" data-open-view="accounts">账户</button><input type="month" class="finance-secondary" data-dashboard-month value="${escapeAttribute(ledgerMonth)}">`)}
         <section class="overview-asset-card">
           <div class="overview-asset-grid">
             ${overviewAssetBlock("家庭", cockpit.familyAssets)}
@@ -255,6 +255,7 @@
             ${overviewAssetBlock("胖胖", cockpit.pangpangAssets)}
           </div>
         </section>
+        ${overviewDreamSummary(cockpit)}
         <section class="finance-panel overview-income-panel">${incomeDistributionTable(cockpit.incomeDistribution)}</section>
         <section class="finance-panel overview-spending-panel">${monthlySpendingGrid(cockpit.monthlySpending)}</section>
         <section class="finance-panel overview-destination-panel"><div class="overview-section-title"><strong>本月资金去向</strong></div>${moneyDestinationOverview(cockpit.moneyDestinations)}</section>
@@ -294,7 +295,7 @@
 
   function renderAccounts() {
     if (!window.FinanceAuth?.activeMemberId) {
-      els.content.innerHTML = `<div class="finance-page">${pageHead("我的账户", "请先进入自己的个人页")}${memberAccessPanel("选择你的个人账户", "输入个人密码后，只显示并管理你自己的资金账户。")}</div>`;
+      els.content.innerHTML = `<div class="finance-page">${pageHead("账户", "请先进入自己的个人页")}${memberAccessPanel("选择你的个人账户", "输入个人密码后，只显示并管理你自己的真实资金账户。")}</div>`;
       return;
     }
     const month = monthlyAccountFlows(ledgerMonth);
@@ -302,14 +303,15 @@
     const white = state.members.find((item) => item.id === "member-me" || item.displayName.includes("白白")) || state.members[0];
     const pang = state.members.find((item) => item.id !== white?.id && item.isActive && item.displayName.includes("胖胖")) || state.members.find((item) => item.id !== white?.id && item.isActive);
     const members = [white, pang].filter(Boolean);
-    const accountsFor = (memberId) => state.accounts.filter((item) => !item.isArchived && item.ownerMemberId === memberId && !item.isShared);
-    const goals = effectiveGoals(investmentSummaries());
-    const specialAnimals = accountGardenAnimals(white, pang);
+    const isRealAccount = (item) => !item.isArchived && item.type !== "VIRTUAL_POOL";
+    const accountsFor = (memberId) => state.accounts.filter((item) => isRealAccount(item) && item.ownerMemberId === memberId && !item.isShared);
+    const familyAccounts = state.accounts.filter((item) => isRealAccount(item) && (item.ownerMemberId === "family" || item.isShared));
+    const familyMember = { id: "family", displayName: "家庭公共" };
     els.content.innerHTML = `
       <div class="finance-page">
-        ${pageHead("家庭账户花园", `${me?.displayName || "当前成员"}已登录`, `<button class="finance-primary" data-add-account>＋ 添加我的账户</button>`)}
-        ${dreamGarden(goals, specialAnimals)}
-        <div class="member-account-sections">${members.map((member) => memberAccountSection(member, accountsFor(member.id), month, member.id === me?.id)).join("")}</div>
+        ${pageHead("账户", `${me?.displayName || "当前成员"}已登录`, `<button class="finance-primary" data-add-account>＋ 添加账户</button>`)}
+        ${dreamFundDetails()}
+        <div class="member-account-sections">${members.map((member) => memberAccountSection(member, accountsFor(member.id), month, member.id === me?.id)).join("")}${memberAccountSection(familyMember, familyAccounts, month, true, false)}</div>
       </div>`;
   }
 
@@ -365,7 +367,7 @@
         </section>
         <section class="finance-panel finance-mine-links">
           <button type="button" data-open-view="ledger"><span>我的账本</span><b>查看个人与家庭明细 ›</b></button>
-          <button type="button" data-open-view="accounts"><span>我的账户</span><b>余额与本月资金流 ›</b></button>
+          <button type="button" data-open-view="accounts"><span>账户</span><b>真实账户与 Dream 基金明细 ›</b></button>
           <button type="button" data-open-view="members"><span>家庭成员</span><b>成员与共享账目 ›</b></button>
           ${window.FinanceAuth?.activeMemberId ? `<button type="button" data-change-member-password><span>修改登录密码</span><b>下次在首页使用新密码 ›</b></button>` : ""}
           ${window.FinanceAuth?.household ? `<button type="button" data-cloud-sign-out><span>切换用户 / 退出</span><b>返回首页登录 ›</b></button>` : ""}
@@ -391,10 +393,12 @@
   function renderDreams() {
     const investments = investmentSummaries();
     const goals = effectiveGoals(investments);
+    const white = state.members.find((item) => item.id === "member-me" || item.displayName.includes("白白")) || state.members[0];
+    const pang = state.members.find((item) => item.id !== white?.id && item.isActive && item.displayName.includes("胖胖")) || state.members.find((item) => item.id !== white?.id && item.isActive);
     els.content.innerHTML = `
       <div class="finance-page">
-        ${pageHead("鹅鸭鸡", "鹅：长期财富与投资；鸭：中长期目标；鸡：短期愿望和计划", `<button class="finance-primary" data-add-goal>＋ 新建目标</button>`)}
-        <div class="finance-goal-grid">${goals.map(goalCard).join("")}</div>
+        ${pageHead("Dream花园", "", `<button class="finance-primary" data-add-goal>＋ 新建目标</button>`)}
+        ${dreamGarden(goals, accountGardenAnimals(white, pang), false)}
       </div>`;
   }
 
@@ -922,6 +926,8 @@
     const pangpangIncome = incomeFor(partner?.id);
     const monthIncome = sum(incomeRows.map((item) => item.amountCents));
     const allocationRows = monthRows.filter((item) => ["EXPENSE", "TRANSFER"].includes(item.type));
+    const monthlyDreamTransfer = sum(monthRows.filter((item) => item.type === "TRANSFER" && topCategoryId(item.categoryId) === "category-dream").map((item) => item.amountCents));
+    const monthlyDreamExpense = sum(monthRows.filter((item) => item.type === "EXPENSE" && topCategoryId(item.categoryId) === "category-dream").map((item) => item.amountCents));
     const allocation = (rootId) => sum(allocationRows.filter((item) => topCategoryId(item.categoryId) === rootId).map((item) => item.amountCents));
     const familyTransfers = allocationRows.filter((item) => item.type === "TRANSFER" && accountById(item.toAccountId)?.ownerMemberId === "family");
     const distributionFor = (key) => {
@@ -976,7 +982,7 @@
       familyAssets: { total: cashAssets + investmentAssets, investment: investmentAssets, cash: cashAssets, dream: dreamShort + dreamLong, dreamLong, dreamShort },
       baibaiAssets: { total: whiteCash + whiteInvestment, investment: whiteInvestment, cash: whiteCash },
       pangpangAssets: { total: partnerCash + partnerInvestment, investment: partnerInvestment, cash: partnerCash },
-      dreamShort, dreamLong, dreamTotal: dreamShort + dreamLong,
+      dreamShort, dreamLong, dreamTotal: dreamShort + dreamLong, monthlyDreamTransfer, monthlyDreamExpense,
       baibaiIncome, pangpangIncome, otherIncome: Math.max(0, monthIncome - baibaiIncome - pangpangIncome), monthIncome,
       incomeDistribution: [{ label: "白白", ...whiteDistribution }, { label: "胖胖", ...partnerDistribution }, { label: "其他收入", ...otherDistribution }],
       allocations: { fixed: allocation("category-fixed"), living: allocation("category-living"), flex: allocation("category-flex"), dream: allocation("category-dream"), investment: allocation("category-investment"), family: sum(familyTransfers.map((item) => item.amountCents)) },
@@ -999,6 +1005,10 @@
   function overviewAssetBlock(label, assets) {
     const rows = [[`${label}总资产`, assets.total], ["投资资产", assets.investment], ["现金资产", assets.cash]];
     return `<article class="overview-asset-block ${label === "家庭" ? "is-family" : ""}"><div class="overview-asset-block-head"><span>${escapeHtml(label)}</span><strong>${money(assets.total)}</strong></div><div class="overview-asset-breakdown">${rows.slice(1).map(([name, value]) => `<div><span>${escapeHtml(name)}</span><strong>${money(value)}</strong></div>`).join("")}</div></article>`;
+  }
+  function overviewDreamSummary(cockpit) {
+    const rows = [["Dream基金总额", cockpit.dreamTotal], ["长期Dream", cockpit.dreamLong], ["短期Dream", cockpit.dreamShort], ["本月划入Dream", cockpit.monthlyDreamTransfer], ["本月Dream支出", cockpit.monthlyDreamExpense]];
+    return `<section class="overview-dream-summary">${rows.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${money(value)}</strong></div>`).join("")}</section>`;
   }
   function incomeDistributionTable(rows) {
     const cells = (item) => [["本月收入", item.income, "is-income"], ["划入Dream基金", item.dream, "is-dream"], ["划入个人生活费", item.living, "is-living"], ["划入家庭公共账户", item.family, "is-family"]];
@@ -1030,17 +1040,17 @@
     };
     return [make("garden-pigeon", "PIGEON", "🕊️", "家庭鸽子", "家庭公共消费账户", "family"), make("garden-magpie", "MAGPIE", "🐦", "白白喜鹊", "白白生活支出账户", white?.id || ""), make("garden-pupa", "PUPA", "🐛", "胖胖蚕蛹", "胖胖生活支出账户", pang?.id || "")];
   }
-  function memberAccountSection(member, accounts, flows, unlocked) {
+  function memberAccountSection(member, accounts, flows, unlocked, canAdd = unlocked) {
     const total = accountGroupTotal(accounts);
-    return `<section class="finance-panel member-account-section ${unlocked ? "is-unlocked" : "is-locked"}"><div class="finance-panel-head"><div><strong>${escapeHtml(member.displayName)}的账户</strong><br><span>${accounts.length} 个账户 · ${unlocked ? money(total) : "仅本人可见"}</span></div>${unlocked ? `<button class="finance-primary" data-add-account>＋ 账户</button>` : `<span class="member-account-lock">🔒 无法展开</span>`}</div>${unlocked ? `<div class="member-account-table"><div class="member-account-head"><span>账户</span><span>余额</span><span>本月流入 / 流出</span><span>操作</span></div>${accounts.length ? accounts.map((account) => memberAccountRow(account, flows[account.id])).join("") : empty("还没有账户")}</div>` : `<div class="member-account-locked">请使用${escapeHtml(member.displayName)}的个人密码登录后查看。</div>`}</section>`;
+    return `<section class="finance-panel member-account-section ${unlocked ? "is-unlocked" : "is-locked"}"><div class="finance-panel-head"><div><strong>${escapeHtml(member.displayName)}账户</strong><br><span>${accounts.length} 个真实账户 · ${unlocked ? money(total) : "仅本人可见"}</span></div>${unlocked && canAdd ? `<button class="finance-primary" data-add-account>＋ 账户</button>` : unlocked ? "" : `<span class="member-account-lock">🔒 无法展开</span>`}</div>${unlocked ? `<div class="member-account-table"><div class="member-account-head"><span>账户</span><span>余额</span><span>本月流入 / 流出</span><span>操作</span></div>${accounts.length ? accounts.map((account) => memberAccountRow(account, flows[account.id])).join("") : empty("还没有真实账户")}</div>` : `<div class="member-account-locked">请使用${escapeHtml(member.displayName)}的个人密码登录后查看。</div>`}</section>`;
   }
   function memberAccountRow(account, flow = {}) {
     return `<div class="member-account-row"><div class="finance-account-name"><span class="finance-account-type">${escapeHtml(accountIcon(account.type))}</span><div><span>${escapeHtml(accountTypeName(account.type))}</span><strong>${escapeHtml(account.name)}</strong></div></div><strong>${money(account.currentBalanceCents)}</strong><span><small>本月流入 / 流出</small>${money(flow.incoming || 0)} / ${money(flow.outgoing || 0)}</span><div><button data-account-detail="${escapeAttribute(account.id)}">明细</button><button data-edit-account="${escapeAttribute(account.id)}">编辑</button><button class="is-primary" data-adjust-account="${escapeAttribute(account.id)}">＋金额</button></div></div>`;
   }
-  function dreamGarden(goals, accountAnimals = []) {
+  function dreamGarden(goals, accountAnimals = [], showHeader = true) {
     const weights = { GOOSE: 0, DUCK: 1, CHICKEN: 2, PIGEON: 3, MAGPIE: 4, PUPA: 5 };
     const ordered = [...goals, ...accountAnimals].sort((a, b) => weights[a.kind] - weights[b.kind]);
-    return `<section class="finance-panel dream-garden"><div class="finance-panel-head"><div><strong>家庭 Dream 花园</strong><br><span>存得越多，动物从灰色慢慢变成彩色</span></div><button class="finance-secondary" data-add-goal>＋ 愿望</button></div><div class="dream-garden-scene"><div class="dream-sun">☀</div><div class="dream-cloud dream-cloud-one">☁</div><div class="dream-cloud dream-cloud-two">☁</div><div class="dream-tree dream-tree-one">🌳</div><div class="dream-tree dream-tree-two">🌳</div><div class="dream-pond"></div><div class="dream-path"></div><div class="dream-fence">╫ ╫ ╫ ╫ ╫ ╫ ╫ ╫</div>${ordered.map((animal, index) => dreamGardenAnimal(animal, index)).join("")}</div></section>`;
+    return `<section class="finance-panel dream-garden">${showHeader ? `<div class="finance-panel-head"><div><strong>家庭 Dream 花园</strong><br><span>存得越多，动物从灰色慢慢变成彩色</span></div><button class="finance-secondary" data-add-goal>＋ 愿望</button></div>` : ""}<div class="dream-garden-scene"><div class="dream-sun">☀</div><div class="dream-cloud dream-cloud-one">☁</div><div class="dream-cloud dream-cloud-two">☁</div><div class="dream-tree dream-tree-one">🌳</div><div class="dream-tree dream-tree-two">🌳</div><div class="dream-pond"></div><div class="dream-path"></div><div class="dream-fence">╫ ╫ ╫ ╫ ╫ ╫ ╫ ╫</div>${ordered.map((animal, index) => dreamGardenAnimal(animal, index)).join("")}</div></section>`;
   }
   function dreamGardenAnimal(goal, index) {
     const ratio = goal.targetAmountCents > 0 ? Math.min(100, Math.max(0, goal.currentAmountCents / goal.targetAmountCents * 100)) : 0;
@@ -1060,10 +1070,10 @@
     if (!animal) return;
     const ratio = animal.targetAmountCents > 0 ? Math.min(100, Math.max(0, animal.currentAmountCents / animal.targetAmountCents * 100)) : 0;
     const icon = animal.icon || (animal.kind === "GOOSE" ? "🪿" : animal.kind === "DUCK" ? "🦆" : "🐔");
-    const purpose = animal.description || animal.note || (animal.kind === "GOOSE" ? "退休本金不动" : animal.kind === "DUCK" ? "长期梦想" : "短期愿望");
+    const purpose = animalPurpose(animal);
     const eggAmount = Math.max(0, Number(animal.earningsCents) || 0);
     const sourceAccountId = animal.eggSourceId || animal.linkedAccountIds?.[0] || (animal.linkedInvestmentAccountIds?.length ? "account-securities-self" : "");
-    const modal = createModal(animal.name, `<div class="dream-detail-content"><div class="dream-detail-hero"><div class="dream-animal-visual" style="--fill:${ratio}%"><span class="dream-animal-base">${icon}</span><span class="dream-animal-fill">${icon}</span></div><div><span>${escapeHtml(purpose)}</span><strong>${ratio.toFixed(1)}%</strong></div></div><dl class="dream-detail-stats"><div><dt>当前金额</dt><dd>${money(animal.currentAmountCents)}</dd></div><div><dt>目标金额</dt><dd>${money(animal.targetAmountCents)}</dd></div><div><dt>完成度</dt><dd>${ratio.toFixed(1)}%</dd></div><div><dt>蛋金额</dt><dd>🥚 ${money(eggAmount)}</dd></div></dl><button class="dream-detail-egg" data-dream-detail-egg>🥚 分配这只动物的蛋（利息）</button><div class="dream-detail-actions"><button class="finance-primary" data-dream-detail-deposit>存入</button><button class="finance-secondary" data-dream-detail-record>记录</button><button class="finance-secondary" data-dream-detail-edit>编辑</button></div></div>`);
+    const modal = createModal(animal.name, `<div class="dream-detail-content"><div class="dream-detail-hero"><div class="dream-animal-visual" style="--fill:${ratio}%"><span class="dream-animal-base">${icon}</span><span class="dream-animal-fill">${icon}</span></div><div><span>${escapeHtml(purpose)}</span><strong>${ratio.toFixed(1)}%</strong></div></div><dl class="dream-detail-stats"><div><dt>当前金额</dt><dd>${money(animal.currentAmountCents)}</dd></div><div><dt>目标金额</dt><dd>${money(animal.targetAmountCents)}</dd></div><div><dt>完成度</dt><dd>${ratio.toFixed(1)}%</dd></div><div><dt>蛋金额</dt><dd>🥚 ${money(eggAmount)}</dd></div></dl><button class="dream-detail-egg" data-dream-detail-egg>🥚 利息/收益：${money(eggAmount)}</button><div class="dream-detail-actions"><button class="finance-primary" data-dream-detail-deposit>存入</button><button class="finance-secondary" data-dream-detail-record>记录</button><button class="finance-secondary" data-dream-detail-edit>编辑</button></div></div>`);
     modal.classList.add("is-dream-detail");
     modal.querySelector(".finance-modal")?.classList.add("dream-detail-sheet");
     modal.addEventListener("click", (event) => {
@@ -1088,6 +1098,19 @@
   function settingsMemberRow(member) { return `<div class="settings-row"><div><span>${escapeHtml(member.role)}</span><strong>${escapeHtml(member.displayName)}${member.isCurrentUser ? " · 当前" : ""}</strong><small>${member.includeInFamilyAssets !== false ? "计入家庭资产" : "不计家庭资产"} · ${member.participatesInFamilyLedger !== false ? "参与公共账本" : "不参与公共账本"}</small></div><div class="finance-inline-actions"><button class="finance-secondary" data-edit-member="${escapeAttribute(member.id)}">编辑</button>${member.isCurrentUser ? "" : `<button class="finance-secondary is-danger" data-delete-member="${escapeAttribute(member.id)}">删除</button>`}</div></div>`; }
   function allocationRuleView(rule = {}) { const values = [["固定", rule.fixedBps], ["生活", rule.livingBps], ["机动", rule.flexBps], ["Dream", rule.dreamBps], ["投资", rule.investmentBps]]; return `<div class="allocation-rule">${values.map(([label, bps]) => `<div><span>${label}</span><strong>${((Number(bps) || 0) / 100).toFixed(0)}%</strong></div>`).join("")}</div>`; }
   function dreamFundSettlement(fund) { return Math.round((Number(fund.openingBalanceCents) + Number(fund.annualTransferCents) - Number(fund.annualExpenseCents)) * (1 + Number(fund.annualYieldBps || 0) / 10000)); }
+  function dreamFundEarnings(fund) { return Number(fund.currentBalanceCents) - (Number(fund.openingBalanceCents) + Number(fund.annualTransferCents) - Number(fund.annualExpenseCents)); }
+  function dreamFundDetails() {
+    const funds = state.dreamFunds.filter((item) => ["LONG", "SHORT"].includes(item.type)).sort((a, b) => (a.type === "LONG" ? 0 : 1) - (b.type === "LONG" ? 0 : 1));
+    const total = sum(funds.map((item) => item.currentBalanceCents));
+    return `<section class="finance-panel dream-fund-details"><div class="dream-fund-details-head"><div><span>Dream基金总额</span><strong>${money(total)}</strong></div><small>虚拟资金池 · 真实资金仍在下方账户中</small></div><div class="dream-fund-detail-grid">${funds.map((fund) => `<article class="dream-fund-detail-card is-${fund.type.toLowerCase()}"><div class="dream-fund-detail-title"><div><span>${fund.type === "LONG" ? "长期" : "短期"} Dream</span><strong>${escapeHtml(fund.name)}</strong></div><b>${money(fund.currentBalanceCents)}</b></div><div class="dream-fund-egg">🥚 利息/蛋 <strong>${signedMoney(dreamFundEarnings(fund))}</strong></div><dl><div><dt>年初余额</dt><dd>${money(fund.openingBalanceCents)}</dd></div><div><dt>本年转入</dt><dd>${money(fund.annualTransferCents)}</dd></div><div><dt>本年支出</dt><dd>${money(fund.annualExpenseCents)}</dd></div><div><dt>收益率</dt><dd>${(Number(fund.annualYieldBps || 0) / 100).toFixed(2)}%</dd></div><div><dt>年末试算</dt><dd>${money(dreamFundSettlement(fund))}</dd></div></dl></article>`).join("")}</div></section>`;
+  }
+  function animalPurpose(animal) {
+    const valid = (value) => { const text = String(value || "").trim(); return text && !/^[?？�\s]+$/.test(text) ? text : ""; };
+    const description = valid(animal.description) || valid(animal.note);
+    if (!description) return "暂无说明";
+    const type = ({ GOOSE: "退休", DUCK: "长期Dream", CHICKEN: "短期Dream", PIGEON: "家庭", MAGPIE: "白白生活", PUPA: "胖胖生活" })[animal.kind] || "Dream目标";
+    return `${type} · ${description}`;
+  }
   function dreamFundCard(fund) { return `<article><div><span>${fund.type === "SHORT" ? "短期" : fund.type === "LONG" ? "长期" : "虚拟池"}</span><strong>${escapeHtml(fund.name)}</strong></div><b>${money(fund.currentBalanceCents)}</b><dl><div><dt>真实存放</dt><dd>${escapeHtml(accountName(fund.storageAccountId))}</dd></div><div><dt>年初</dt><dd>${money(fund.openingBalanceCents)}</dd></div><div><dt>本年转入 / 支出</dt><dd>${money(fund.annualTransferCents)} / ${money(fund.annualExpenseCents)}</dd></div><div><dt>收益率</dt><dd>${(Number(fund.annualYieldBps || 0) / 100).toFixed(2)}%</dd></div><div><dt>年末试算</dt><dd>${money(dreamFundSettlement(fund))}</dd></div></dl><p>${escapeHtml(fund.purpose || fund.note || "--")}</p><div class="finance-inline-actions"><button class="finance-secondary" data-edit-dream-fund="${escapeAttribute(fund.id)}">编辑</button><button class="finance-secondary" data-settle-dream-fund="${escapeAttribute(fund.id)}">年度结算</button></div></article>`; }
 
   function summaryCard(label, value, className) { return `<div class="finance-summary-card"><span>${escapeHtml(label)}</span><strong class="${className || ""}">${escapeHtml(value)}</strong></div>`; }
