@@ -85,8 +85,7 @@
       version: 1,
       updatedAt: now,
       members: [
-        { id: "member-me", displayName: "我", role: "本人", isCurrentUser: true, isActive: true },
-        { id: "member-partner", displayName: "家人", role: "家庭成员", isCurrentUser: false, isActive: true }
+        { id: "member-me", displayName: "我", role: "本人", isCurrentUser: true, isActive: true }
       ],
       categories: CATEGORY_SEEDS.map(([id, name, direction, parentId], index) => ({ id, name, direction, parentId, sortOrder: index + 1, isActive: true })),
       accounts: [
@@ -1111,7 +1110,7 @@
       return items.map((item) => names.has(item.id) && String(item.name || "").includes("?") ? { ...item, name: names.get(item.id) } : item);
     };
     const fallbackMembers = new Map(fallback.members.map((item) => [item.id, item]));
-    const members = (Array.isArray(raw.members) && raw.members.length ? raw.members : fallback.members).map((item) => {
+    const members = (Array.isArray(raw.members) && raw.members.length ? raw.members : fallback.members).filter((item) => item.id !== "member-partner").map((item) => {
       const known = fallbackMembers.get(item.id);
       if (!known) return item;
       return {

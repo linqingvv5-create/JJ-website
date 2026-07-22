@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import worker from "../worker/site-worker.js";
 
 class FakeDb {
-  constructor() { this.locks = new Map(); this.members = [{ id: "member-me" }, { id: "member-partner" }]; }
+  constructor() { this.locks = new Map(); this.members = [{ id: "member-me" }, { id: "member-custom" }]; }
   prepare(sql) {
     const db = this;
     return {
@@ -58,21 +58,21 @@ test("password session protects API routes", async () => {
   const protectedRequest = await worker.fetch(new Request(`${base}/api/state`), env);
   assert.equal(protectedRequest.status, 401);
 
-  const setup = await worker.fetch(new Request(`${base}/api/member-locks/member-partner/password`, {
+  const setup = await worker.fetch(new Request(`${base}/api/member-locks/member-custom/password`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ newPassword: "2468" })
   }), env);
   assert.equal(setup.status, 200);
 
-  const wrongMemberPassword = await worker.fetch(new Request(`${base}/api/member-locks/member-partner/unlock`, {
+  const wrongMemberPassword = await worker.fetch(new Request(`${base}/api/member-locks/member-custom/unlock`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ password: "0000" })
   }), env);
   assert.equal(wrongMemberPassword.status, 401);
 
-  const memberLogin = await worker.fetch(new Request(`${base}/api/member-locks/member-partner/unlock`, {
+  const memberLogin = await worker.fetch(new Request(`${base}/api/member-locks/member-custom/unlock`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ password: "2468" })
@@ -80,11 +80,11 @@ test("password session protects API routes", async () => {
   assert.equal(memberLogin.status, 200);
   assert.ok((await memberLogin.json()).token);
 
-  const partnerHomepageLogin = await worker.fetch(new Request(`${base}/api/session`, {
+  const customHomepageLogin = await worker.fetch(new Request(`${base}/api/session`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password: "2468" })
   }), env);
-  assert.equal(partnerHomepageLogin.status, 200);
-  assert.equal((await partnerHomepageLogin.json()).memberId, "member-partner");
+  assert.equal(customHomepageLogin.status, 200);
+  assert.equal((await customHomepageLogin.json()).memberId, "member-custom");
 });

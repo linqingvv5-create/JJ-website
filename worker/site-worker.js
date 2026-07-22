@@ -36,8 +36,7 @@ const encoder = new TextEncoder();
 
 const CANONICAL_FINANCE_LABELS = {
   members: {
-    "member-me": { displayName: "我", role: "本人" },
-    "member-partner": { displayName: "家人", role: "家庭成员" }
+    "member-me": { displayName: "我", role: "本人" }
   },
   accounts: {
     "account-bank": "银行卡", "account-wechat": "微信", "account-alipay": "支付宝",
@@ -58,6 +57,7 @@ const CANONICAL_FINANCE_LABELS = {
   goals: { "goal-big-goose": "大鹅", "goal-small-goose": "小鹅", "goal-house-duck": "买房鸭", "goal-travel-chicken": "旅游鸡" },
   investments: { "investment-self": "梦想号", "investment-family": "私募号" }
 };
+const REMOVED_MEMBER_IDS = new Set(["member-partner"]);
 
 function corruptedLabel(value) {
   return !String(value || "").trim() || String(value).includes("?");
@@ -71,7 +71,7 @@ function canonicalizeFinanceState(state) {
   });
   return {
     ...state,
-    members: (Array.isArray(state.members) ? state.members : []).map((item) => {
+    members: (Array.isArray(state.members) ? state.members : []).filter((item) => !REMOVED_MEMBER_IDS.has(item?.id)).map((item) => {
       const label = CANONICAL_FINANCE_LABELS.members[item?.id];
       if (!label) return item;
       return {
