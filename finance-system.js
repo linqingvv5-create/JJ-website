@@ -256,8 +256,8 @@
           </div>
         </section>
         <section class="finance-panel overview-income-panel"><div class="overview-section-title"><strong>本月收入</strong></div>${incomeDistributionTable(cockpit.incomeDistribution)}</section>
-        <section class="finance-panel overview-spending-panel">${monthlySpendingGrid(cockpit.monthlySpending)}</section>
-        <section class="finance-panel overview-destination-panel"><div class="overview-section-title"><strong>本月资金去向</strong></div><div class="overview-destination-grid">${cockpitMetric("固定开支", cockpit.allocations.fixed)}${cockpitMetric("生活开支", cockpit.allocations.living)}${cockpitMetric("机动开支", cockpit.allocations.flex)}${cockpitMetric("Dream基金", cockpit.allocations.dream)}${cockpitMetric("投资账户", cockpit.allocations.investment)}${cockpitMetric("家庭公共账户", cockpit.allocations.family)}</div></section>
+        <section class="finance-panel overview-spending-panel"><div class="overview-section-title"><strong>本月支出</strong></div>${monthlySpendingGrid(cockpit.monthlySpending)}</section>
+        <section class="finance-panel overview-destination-panel"><div class="overview-section-title"><strong>本月资金去向</strong></div>${moneyDestinationOverview(cockpit.moneyDestinations)}</section>
       </div>`;
   }
 
@@ -944,6 +944,25 @@
     const monthlyExpenseFor = (ownerId) => sum(monthRows.filter((item) => item.type === "EXPENSE" && ownerOf(item) === ownerId).map((item) => item.amountCents));
     const livingSurplusFor = (ownerId) => Math.max(0, Number(rule.livingBudgets?.[ownerId]) || 0) - livingSpentFor(ownerId);
     const spendingFor = (label, ownerId) => ({ label, expense: monthlyExpenseFor(ownerId), livingSurplus: livingSurplusFor(ownerId), accountSurplus: availableFor(ownerId) });
+    const monthlySpending = [spendingFor("白白", me?.id), spendingFor("胖胖", partner?.id), spendingFor("家庭", "family")];
+    const categoryBlueprints = [
+      { label: "交通", icon: "🚇", keywords: ["交通", "通勤"] },
+      { label: "外卖", icon: "🥡", keywords: ["外卖"] },
+      { label: "外食", icon: "🍽️", keywords: ["外食", "吃饭", "餐饮"] },
+      { label: "购物", icon: "🛍️", keywords: ["购物", "日用品", "衣服", "护肤", "数码"] },
+      { label: "人情", icon: "🧧", keywords: ["人情", "社交"] },
+      { label: "保险", icon: "🛡️", keywords: ["保险"] },
+      { label: "其他", icon: "•••", keywords: [] }
+    ];
+    const categoryTotals = Object.fromEntries(categoryBlueprints.map((item) => [item.label, 0]));
+    monthRows.filter((item) => item.type === "EXPENSE").forEach((item) => {
+      const category = categoryById(item.categoryId);
+      const parent = category?.parentId ? categoryById(category.parentId) : null;
+      const searchText = `${category?.name || ""} ${parent?.name || ""} ${item.merchant || ""} ${item.note || ""}`;
+      const matched = categoryBlueprints.find((target) => target.keywords.some((keyword) => searchText.includes(keyword))) || categoryBlueprints[categoryBlueprints.length - 1];
+      categoryTotals[matched.label] += Number(item.amountCents) || 0;
+    });
+    const consumptionCategories = categoryBlueprints.map((item) => ({ label: item.label, icon: item.icon, value: categoryTotals[item.label] }));
     return {
       cashAssets, investmentAssets, totalAssets: cashAssets + investmentAssets, netAssets: cashAssets + investmentAssets - liabilities,
       familyAssets: { total: cashAssets + investmentAssets, investment: investmentAssets, cash: cashAssets, dream: dreamShort + dreamLong, dreamLong, dreamShort },
@@ -953,7 +972,12 @@
       baibaiIncome, pangpangIncome, otherIncome: Math.max(0, monthIncome - baibaiIncome - pangpangIncome), monthIncome,
       incomeDistribution: [{ label: "白白", ...whiteDistribution }, { label: "胖胖", ...partnerDistribution }, { label: "其他收入", ...otherDistribution }],
       allocations: { fixed: allocation("category-fixed"), living: allocation("category-living"), flex: allocation("category-flex"), dream: allocation("category-dream"), investment: allocation("category-investment"), family: sum(familyTransfers.map((item) => item.amountCents)) },
-      monthlySpending: [spendingFor("白白", me?.id), spendingFor("胖胖", partner?.id), spendingFor("家庭", "family")]
+      monthlySpending,
+      moneyDestinations: {
+        savings: [{ label: "Dream基金", icon: "✨", value: allocation("category-dream") }, { label: "投资账户", icon: "📈", value: allocation("category-investment") }, { label: "家庭公共", icon: "🏦", value: sum(familyTransfers.map((item) => item.amountCents)) }],
+        people: monthlySpending.map((item, index) => ({ label: item.label, icon: ["👩", "👨", "🏠"][index], value: item.expense })),
+        categories: consumptionCategories
+      }
     };
   }
 
@@ -973,7 +997,14 @@
     return `<div class="overview-income-table"><div class="overview-income-head"><span>成员</span><span class="is-income">本月收入</span><span class="is-dream">划入Dream基金</span><span class="is-living">划入个人生活费</span><span class="is-family">划入家庭公共账户</span></div>${rows.map((item) => `<div class="overview-income-row"><strong class="overview-income-member">${escapeHtml(item.label)}</strong>${cells(item).map(([label, value, className]) => `<div class="${className}"><small>${escapeHtml(label)}</small><strong>${money(value)}</strong></div>`).join("")}</div>`).join("")}</div>`;
   }
   function monthlySpendingGrid(rows) {
-    return `<div class="overview-spending-table"><div class="overview-spending-head"><span>成员</span><span>本月支出</span><span>本月生活盈余</span><span>生活费账户总盈余</span></div>${rows.map((item) => `<div class="overview-spending-row"><strong>${escapeHtml(item.label)}</strong><div class="is-expense"><strong>${money(item.expense)}</strong></div><div class="is-surplus"><strong>${money(item.livingSurplus)}</strong></div><div class="is-account-surplus"><strong>${money(item.accountSurplus)}</strong></div></div>`).join("")}</div>`;
+    return `<div class="overview-spending-table"><div class="overview-spending-head"><span>成员</span><span>本月支出</span><span>本月生活余额</span><span>生活费账户总余额</span></div>${rows.map((item) => `<div class="overview-spending-row"><strong>${escapeHtml(item.label)}</strong><div class="is-expense"><strong>${money(item.expense)}</strong></div><div class="is-surplus"><strong>${money(item.livingSurplus)}</strong></div><div class="is-account-surplus"><strong>${money(item.accountSurplus)}</strong></div></div>`).join("")}</div>`;
+  }
+  function destinationChartGroup(title, icon, rows, className) {
+    const maxValue = Math.max(1, ...rows.map((item) => Number(item.value) || 0));
+    return `<section class="destination-chart-group ${className || ""}"><h3><span>${icon}</span>${escapeHtml(title)}</h3><div class="destination-chart-rows">${rows.map((item) => { const value = Number(item.value) || 0; const width = value > 0 ? Math.max(4, Math.round(value / maxValue * 100)) : 0; return `<div class="destination-chart-row"><span class="destination-icon">${item.icon}</span><span class="destination-label">${escapeHtml(item.label)}</span><span class="destination-track"><i style="width:${width}%"></i></span><strong>${money(value)}</strong></div>`; }).join("")}</div></section>`;
+  }
+  function moneyDestinationOverview(groups) {
+    return `<div class="destination-chart-grid">${destinationChartGroup("储蓄去向", "💰", groups.savings, "is-saving")}${destinationChartGroup("消费归属", "👥", groups.people, "is-people")}${destinationChartGroup("消费类别", "🧾", groups.categories, "is-categories")}</div>`;
   }
   function accountGroupTotal(accounts) { return sum(accounts.filter((item) => item.type !== "CREDIT_CARD" && item.type !== "VIRTUAL_POOL").map((item) => item.currentBalanceCents)); }
   function accountGroup(title, accounts, flows, ownerId) { return `<section class="finance-panel account-group"><div class="finance-panel-head"><div><strong>${escapeHtml(title)}</strong><br><span>${accounts.length} 个账户 · ${money(accountGroupTotal(accounts))}</span></div><button class="finance-secondary" data-member-account-detail="${escapeAttribute(ownerId || "")}">查看明细</button></div><div class="finance-account-list">${accounts.length ? accounts.map((account) => accountRow(account, flows[account.id], true)).join("") : empty("暂未添加账户")}</div></section>`; }
