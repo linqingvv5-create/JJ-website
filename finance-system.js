@@ -9,7 +9,7 @@
   const VIEW_TITLES = {
     overview: ["资金驾驶舱", "家庭资产、月度收入、资金分配与虚拟资金池"],
     ledger: ["家庭账本", "收入、支出、转账与资金划拨"],
-    accounts: ["资产账户", "个人、家庭公共与投资账户清单"],
+    accounts: ["我的账户", "个人资金账户与 Dream 愿望"],
     settings: ["资金设置", "成员、分类、标签、分配规则与 Dream 基金"],
     members: ["资金设置", "成员、分类、标签、分配规则与 Dream 基金"],
     dreams: ["鹅鸭鸡", "长期积累、中期目标和短期愿望"],
@@ -143,7 +143,6 @@
     document.querySelectorAll("[data-primary-section]").forEach((button) => {
       button.addEventListener("click", () => openPrimarySection(button.dataset.primarySection));
     });
-    document.querySelector("[data-stock-board-entry]")?.addEventListener("click", () => openInvestmentTab("holdings"));
     els.moduleTabs?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-module-tab]");
       if (!button) return;
@@ -163,6 +162,7 @@
 
   function openPrimarySection(section) {
     if (["overview", "ledger", "accounts", "settings"].includes(section)) openFinanceView(section);
+    else if (section === "investment") openInvestmentTab("holdings");
     else if (section === "funds") openFinanceView(navPreference.funds || "overview");
     else openFinanceView("overview");
   }
@@ -247,7 +247,7 @@
     const cockpit = cockpitSummary(monthly, investments);
     els.content.innerHTML = `
       <div class="finance-page">
-        ${pageHead("家庭资金总览", "", `<input type="month" class="finance-secondary" data-dashboard-month value="${escapeAttribute(ledgerMonth)}">`)}
+        ${pageHead("家庭资金总览", "", `<button class="finance-primary overview-account-entry" data-open-view="accounts">我的账户</button><input type="month" class="finance-secondary" data-dashboard-month value="${escapeAttribute(ledgerMonth)}">`)}
         <section class="overview-asset-card">
           <div class="overview-asset-grid">
             ${overviewAssetBlock("家庭", cockpit.familyAssets)}
@@ -293,19 +293,22 @@
   }
 
   function renderAccounts() {
+    if (!window.FinanceAuth?.activeMemberId) {
+      els.content.innerHTML = `<div class="finance-page">${pageHead("我的账户", "请先进入自己的个人页")}${memberAccessPanel("选择你的个人账户", "输入个人密码后，只显示并管理你自己的资金账户。")}</div>`;
+      return;
+    }
     const month = monthlyAccountFlows(ledgerMonth);
-    const investments = investmentSummaries();
-    const cockpit = cockpitSummary(monthlySummary(ledgerMonth), investments);
-    const me = currentMember();
-    const partner = partnerMember();
+    const me = state.members.find((item) => item.id === window.FinanceAuth.activeMemberId) || currentMember();
     const personal = state.accounts.filter((item) => !item.isArchived && item.ownerMemberId === me?.id && !item.isShared);
-    const partnerAccounts = state.accounts.filter((item) => !item.isArchived && item.ownerMemberId === partner?.id && !item.isShared);
-    const familyAccounts = state.accounts.filter((item) => !item.isArchived && (item.ownerMemberId === "family" || item.isShared));
+    const goals = effectiveGoals(investmentSummaries());
+    const incoming = sum(personal.map((item) => month[item.id]?.incoming || 0));
+    const outgoing = sum(personal.map((item) => month[item.id]?.outgoing || 0));
     els.content.innerHTML = `
       <div class="finance-page">
-        ${pageHead("资产账户", "钱具体放在哪里，按个人与家庭公共区域查看", `<button class="finance-primary" data-add-account>＋ 添加账户</button>`)}
-        <section class="account-totals">${cockpitMetric("家庭总资产", cockpit.totalAssets)}${cockpitMetric("白白个人资产", accountGroupTotal(personal))}${cockpitMetric("胖胖个人资产", accountGroupTotal(partnerAccounts))}${cockpitMetric("家庭公共资产", accountGroupTotal(familyAccounts))}${cockpitMetric("投资资产合计", cockpit.investmentAssets)}${cockpitMetric("Dream基金合计", cockpit.dreamTotal)}</section>
-        <div class="account-groups">${accountGroup("白白个人账户", personal, month, me?.id)}${accountGroup("胖胖个人账户", partnerAccounts, month, partner?.id)}${accountGroup("家庭公共账户", familyAccounts, month, "family")}</div>
+        ${pageHead(`${me?.displayName || "我的"}的账户`, "只显示当前个人页的资金账户", `<button class="finance-primary" data-add-account>＋ 添加账户</button>`)}
+        <section class="personal-account-summary">${cockpitMetric("账户总余额", accountGroupTotal(personal))}${cockpitMetric("本月流入", incoming)}${cockpitMetric("本月流出", outgoing)}</section>
+        <div class="personal-account-grid">${personal.length ? personal.map((account) => personalAccountCard(account, month[account.id])).join("") : empty("还没有个人账户，点击上方添加账户。")}</div>
+        ${dreamGarden(goals)}
       </div>`;
   }
 
@@ -486,6 +489,12 @@
     if (editGoal) { openGoalModal(editGoal.dataset.editGoal); return; }
     const goalHistory = event.target.closest("[data-goal-history]");
     if (goalHistory) { openGoalHistory(goalHistory.dataset.goalHistory); return; }
+    const gooseEggs = event.target.closest("[data-goose-eggs]");
+    if (gooseEggs) {
+      const goal = effectiveGoals(investmentSummaries()).find((item) => item.id === gooseEggs.dataset.gooseEggs);
+      openTransactionModal({ type: "TRANSFER", fromAccountId: goal?.linkedAccountIds?.[0] || "", amountCents: Math.max(0, Number(goal?.earningsCents) || 0), note: `${goal?.name || "鹅"}的鹅蛋收益再分配` });
+      return;
+    }
     const allocate = event.target.closest("[data-allocate-goal]");
     if (allocate) {
       const goal = goalById(allocate.dataset.allocateGoal);
@@ -626,7 +635,7 @@
     const member = currentMember();
     const roots = state.categories.filter((item) => !item.parentId && item.isActive !== false);
     return `<form class="finance-form">
-      <label class="is-wide"><span>金额（元）</span><input class="finance-amount-input" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" required autofocus></label>
+      <label class="is-wide"><span>金额（元）</span><input class="finance-amount-input" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="${prefill.amountCents ? (Number(prefill.amountCents) / 100).toFixed(2) : ""}" placeholder="0.00" required autofocus></label>
       <label><span>类型</span><select name="type">${optionList([["INCOME","收入"],["EXPENSE","支出"],["TRANSFER","转账"]], type)}</select></label>
       <label><span>日期</span><input name="occurredAt" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label>
       <label><span>所属人</span><select name="ownerMemberId"><option value="${escapeAttribute(member?.id || "")}">${escapeHtml(member?.displayName || "白白")}</option>${state.members.filter((item) => item.id !== member?.id && item.isActive).map((item) => `<option value="${escapeAttribute(item.id)}">${escapeHtml(item.displayName)}</option>`).join("")}<option value="family">家庭公共</option></select></label>
@@ -635,7 +644,7 @@
       <label data-from-field><span>支付 / 转出账户</span><select name="fromAccountId"><option value="">请选择</option>${accountOptions(prefill.fromAccountId)}</select></label>
       <label data-to-field><span>收入 / 转入账户</span><select name="toAccountId"><option value="">请选择</option>${accountOptions(prefill.toAccountId)}</select></label>
       <label><span>标签</span><select name="tag"><option value="">无标签</option>${state.tags.map((tag) => `<option value="${escapeAttribute(tag)}">${escapeHtml(tag)}</option>`).join("")}</select></label>
-      <label class="is-wide"><span>备注</span><input name="note" type="text" placeholder="用途或说明"></label>
+      <label class="is-wide"><span>备注</span><input name="note" type="text" value="${escapeAttribute(prefill.note || "")}" placeholder="用途或说明"></label>
       <div class="finance-form-actions"><button type="button" class="finance-secondary" data-close-finance-modal>取消</button><button type="submit" class="finance-primary">保存</button></div>
     </form>`;
   }
@@ -739,10 +748,11 @@
 
   function openAccountModal(accountId) {
     const existing = accountById(accountId);
+    const owner = currentMember();
     const modal = createModal(existing ? "编辑账户" : "添加账户", `<form class="finance-form">
       <label class="is-wide"><span>账户名称</span><input name="name" value="${escapeAttribute(existing?.name || "")}" required placeholder="例如：招商银行工资卡"></label>
       <label><span>账户类型</span><select name="type">${optionList([["BANK","银行卡"],["WECHAT","微信"],["ALIPAY","支付宝"],["CASH","现金"],["CREDIT_CARD","信用卡"],["FAMILY_SHARED","家庭公共账户"],["FUND","基金账户"],["SECURITIES","证券账户"],["VIRTUAL_POOL","虚拟资金池"],["OTHER","其他账户"]], existing?.type || "BANK")}</select></label>
-      <label><span>所属成员</span><select name="ownerMemberId">${memberOptions(existing?.ownerMemberId)}<option value="family" ${existing?.ownerMemberId === "family" ? "selected" : ""}>家庭公共</option></select></label>
+      <input type="hidden" name="ownerMemberId" value="${escapeAttribute(owner?.id || existing?.ownerMemberId || "")}"><label><span>所属成员</span><input value="${escapeAttribute(owner?.displayName || "当前成员")}" disabled></label>
       ${existing ? "" : `<label><span>初始余额（元）</span><input name="balance" type="number" step="0.01" value="0" required></label>`}
       <label><span>是否共享</span><select name="isShared"><option value="true" ${existing?.isShared ? "selected" : ""}>家庭共享</option><option value="false" ${existing && !existing.isShared ? "selected" : ""}>个人私有</option></select></label>
       <label><span>计入家庭总资产</span><select name="include"><option value="true" ${existing?.includeInFamilyAssets !== false ? "selected" : ""}>计入</option><option value="false" ${existing?.includeInFamilyAssets === false ? "selected" : ""}>不计入</option></select></label>
@@ -1007,6 +1017,20 @@
     return `<div class="destination-chart-grid">${destinationChartGroup("储蓄去向", "💰", groups.savings, "is-saving")}${destinationChartGroup("消费归属", "👥", groups.people, "is-people")}${destinationChartGroup("消费类别", "🧾", groups.categories, "is-categories")}</div>`;
   }
   function accountGroupTotal(accounts) { return sum(accounts.filter((item) => item.type !== "CREDIT_CARD" && item.type !== "VIRTUAL_POOL").map((item) => item.currentBalanceCents)); }
+  function personalAccountCard(account, flow = {}) {
+    return `<article class="personal-account-card"><div class="personal-account-card-head"><div class="finance-account-name"><span class="finance-account-type">${escapeHtml(accountIcon(account.type))}</span><div><span>${escapeHtml(accountTypeName(account.type))}</span><strong>${escapeHtml(account.name)}</strong></div></div><strong class="personal-account-balance">${money(account.currentBalanceCents)}</strong></div><div class="personal-account-flow"><span>本月流入 <strong>${money(flow.incoming || 0)}</strong></span><span>本月流出 <strong>${money(flow.outgoing || 0)}</strong></span></div><div class="personal-account-actions"><button class="finance-secondary" data-account-detail="${escapeAttribute(account.id)}">明细</button><button class="finance-secondary" data-edit-account="${escapeAttribute(account.id)}">编辑</button><button class="finance-primary" data-adjust-account="${escapeAttribute(account.id)}">＋ 金额</button></div></article>`;
+  }
+  function dreamGarden(goals) {
+    const ordered = [...goals].sort((a, b) => ({ GOOSE: 0, DUCK: 1, CHICKEN: 2 })[a.kind] - ({ GOOSE: 0, DUCK: 1, CHICKEN: 2 })[b.kind]);
+    return `<section class="finance-panel dream-garden"><div class="finance-panel-head"><div><strong>鹅鸭鸡 Dream 花园</strong><br><span>动物由下往上涂满，代表愿望逐步完成</span></div><button class="finance-secondary" data-add-goal>＋ 愿望</button></div><div class="dream-garden-legend"><span>🪿 鹅 · 退休超长期</span><span>🦆 鸭 · 长期梦想</span><span>🐔 鸡 · 短期愿望</span></div><div class="dream-garden-canvas">${ordered.map(dreamGardenAnimal).join("")}</div></section>`;
+  }
+  function dreamGardenAnimal(goal) {
+    const ratio = Math.min(100, Math.max(0, progress(goal)));
+    const icon = goal.kind === "GOOSE" ? "🪿" : goal.kind === "DUCK" ? "🦆" : "🐔";
+    const description = goal.kind === "GOOSE" ? "退休本金不动" : goal.kind === "DUCK" ? "长期梦想" : "短期愿望";
+    const egg = goal.kind === "GOOSE" ? `<button class="dream-egg-button" data-goose-eggs="${escapeAttribute(goal.id)}">🥚 鹅蛋 ${money(Math.max(0, goal.earningsCents))}</button>` : "";
+    return `<article class="dream-garden-animal"><button class="dream-animal-visual" data-edit-goal="${escapeAttribute(goal.id)}" style="--fill:${ratio}%" aria-label="编辑${escapeAttribute(goal.name)}"><span class="dream-animal-base">${icon}</span><span class="dream-animal-fill">${icon}</span></button><strong>${escapeHtml(goal.name)}</strong><span>${description} · ${formatProgress(goal)}</span><small>${money(goal.currentAmountCents)} / ${money(goal.targetAmountCents)}</small>${egg}<div><button data-allocate-goal="${escapeAttribute(goal.id)}">存入</button><button data-goal-history="${escapeAttribute(goal.id)}">记录</button></div></article>`;
+  }
   function accountGroup(title, accounts, flows, ownerId) { return `<section class="finance-panel account-group"><div class="finance-panel-head"><div><strong>${escapeHtml(title)}</strong><br><span>${accounts.length} 个账户 · ${money(accountGroupTotal(accounts))}</span></div><button class="finance-secondary" data-member-account-detail="${escapeAttribute(ownerId || "")}">查看明细</button></div><div class="finance-account-list">${accounts.length ? accounts.map((account) => accountRow(account, flows[account.id], true)).join("") : empty("暂未添加账户")}</div></section>`; }
   function settingsMemberRow(member) { return `<div class="settings-row"><div><span>${escapeHtml(member.role)}</span><strong>${escapeHtml(member.displayName)}${member.isCurrentUser ? " · 当前" : ""}</strong><small>${member.includeInFamilyAssets !== false ? "计入家庭资产" : "不计家庭资产"} · ${member.participatesInFamilyLedger !== false ? "参与公共账本" : "不参与公共账本"}</small></div><div class="finance-inline-actions"><button class="finance-secondary" data-edit-member="${escapeAttribute(member.id)}">编辑</button>${member.isCurrentUser ? "" : `<button class="finance-secondary is-danger" data-delete-member="${escapeAttribute(member.id)}">删除</button>`}</div></div>`; }
   function allocationRuleView(rule = {}) { const values = [["固定", rule.fixedBps], ["生活", rule.livingBps], ["机动", rule.flexBps], ["Dream", rule.dreamBps], ["投资", rule.investmentBps]]; return `<div class="allocation-rule">${values.map(([label, bps]) => `<div><span>${label}</span><strong>${((Number(bps) || 0) / 100).toFixed(0)}%</strong></div>`).join("")}</div>`; }
