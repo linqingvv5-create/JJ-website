@@ -255,8 +255,8 @@
             ${overviewAssetBlock("胖胖", cockpit.pangpangAssets)}
           </div>
         </section>
-        <section class="finance-panel overview-income-panel"><div class="overview-section-title"><strong>本月收入</strong></div>${incomeDistributionTable(cockpit.incomeDistribution)}</section>
-        <section class="finance-panel overview-spending-panel"><div class="overview-section-title"><strong>本月支出</strong></div>${monthlySpendingGrid(cockpit.monthlySpending)}</section>
+        <section class="finance-panel overview-income-panel">${incomeDistributionTable(cockpit.incomeDistribution)}</section>
+        <section class="finance-panel overview-spending-panel">${monthlySpendingGrid(cockpit.monthlySpending)}</section>
         <section class="finance-panel overview-destination-panel"><div class="overview-section-title"><strong>本月资金去向</strong></div>${moneyDestinationOverview(cockpit.moneyDestinations)}</section>
       </div>`;
   }
