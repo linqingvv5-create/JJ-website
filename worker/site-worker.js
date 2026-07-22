@@ -162,7 +162,12 @@ async function memberLocksResponse(request, env, url) {
     return json({ ok: true, token: await createSessionToken(secret, { type: "member", memberId }) }, 200, request);
   }
 
-  return new Response("Method Not Allowed", { status: 405, headers: { ...apiHeaders(request), allow: action === "unlock" ? "POST, OPTIONS" : "PUT, OPTIONS" } });
+  if (action === "password" && request.method === "DELETE") {
+    await env.DB.prepare("DELETE FROM finance_member_locks WHERE member_id = ?1").bind(memberId).run();
+    return json({ ok: true }, 200, request);
+  }
+
+  return new Response("Method Not Allowed", { status: 405, headers: { ...apiHeaders(request), allow: action === "unlock" ? "POST, OPTIONS" : "PUT, DELETE, OPTIONS" } });
 }
 
 function apiHeaders(request) {
@@ -174,7 +179,7 @@ function apiHeaders(request) {
   };
   if (origin && ALLOWED_ORIGINS.has(origin)) {
     headers["access-control-allow-origin"] = origin;
-    headers["access-control-allow-methods"] = "GET, POST, PUT, OPTIONS";
+    headers["access-control-allow-methods"] = "GET, POST, PUT, DELETE, OPTIONS";
     headers["access-control-allow-headers"] = "Content-Type, Authorization, X-Member-Authorization";
   }
   return headers;
@@ -347,6 +352,7 @@ export default {
       }
     }
     if (url.pathname === "/api/health") return json({ ok: true }, 200, request);
+    if (!env.ASSETS) return json({ error: "Not Found" }, 404, request);
     const assetUrl = new URL(request.url);
     if (assetUrl.pathname === "/") assetUrl.pathname = "/finance.html";
     return env.ASSETS.fetch(new Request(assetUrl, request));

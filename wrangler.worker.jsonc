@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "linqing-finance-api",
+  "main": "worker/site-worker.js",
+  "compatibility_date": "2026-05-15",
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "linqing-finance-db",
+      "database_id": "c83b62bd-65ec-4cb3-99e8-47e839b76866",
+      "migrations_dir": "drizzle"
+    }
+  ]
+}

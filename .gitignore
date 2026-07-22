@@ -4,3 +4,6 @@ state.json
 .dev.vars
 dist/
 .site-package.tar.gz
+.site-package-*.tar.gz
+.npm-cache/
+.wrangler-login*.log

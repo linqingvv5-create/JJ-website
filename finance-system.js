@@ -3,9 +3,7 @@
 
   const CACHE_KEY = "linqing-finance-system-cache-v1";
   const NAV_PREFERENCE_KEY = "linqing-finance-navigation-v1";
-  const API_ORIGIN = window.location.hostname.endsWith("github.io")
-    ? "https://linqing-trading-dashboard.linqingvv5.chatgpt.site"
-    : "";
+  const API_ORIGIN = "https://linqing-finance-api.linqingvv5.workers.dev";
   const API_URL = `${API_ORIGIN}/api/finance/state`;
   const INVESTMENT_STORAGE_KEY = "linqing-trade-board-excel-v1";
   const VIEW_TITLES = {
