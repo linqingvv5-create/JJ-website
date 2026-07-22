@@ -4,7 +4,7 @@
   const TOKEN_KEY = "linqing-finance-session-v1";
   const MEMBER_TOKEN_KEY = "linqing-finance-member-session-v1";
   const MEMBER_ID_KEY = "linqing-finance-member-id-v1";
-  const SERVICE_ORIGIN = "https://linqing-finance-api.linqingvv5.workers.dev";
+  const SERVICE_ORIGIN = "https://jj-website-c5g.pages.dev";
   const gate = document.getElementById("auth-gate");
   const card = document.getElementById("auth-card");
   const nativeFetch = window.fetch.bind(window);

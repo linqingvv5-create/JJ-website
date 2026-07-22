@@ -36,6 +36,7 @@ foreach ($asset in $assets) {
 }
 Copy-Item -LiteralPath (Join-Path $root 'finance.html') -Destination (Join-Path $client 'index.html') -Force
 Copy-Item -LiteralPath (Join-Path $root 'worker\site-worker.js') -Destination (Join-Path $server 'index.js') -Force
+Copy-Item -LiteralPath (Join-Path $root 'worker\site-worker.js') -Destination (Join-Path $client '_worker.js') -Force
 Copy-Item -LiteralPath (Join-Path $root '.openai\hosting.json') -Destination (Join-Path $hosting 'hosting.json') -Force
 Copy-Item -Path (Join-Path $root 'drizzle\*.sql') -Destination (Join-Path $hosting 'drizzle') -Force
 
