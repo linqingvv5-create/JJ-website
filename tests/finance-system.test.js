@@ -60,7 +60,9 @@ const month = new Date().toISOString().slice(0, 7);
 const initialInvestments = api.investmentSummaries();
 const initialNetAssets = api.familyAssetTotals(initialInvestments).netAssets;
 assert.equal(api.getState().categories.find((item) => item.id === "expense-food").name, "吃饭");
-assert.deepEqual(JSON.parse(JSON.stringify(api.getState().categories.filter((item) => !item.parentId && item.isActive).map((item) => item.name))), ["固定开支", "生活开支", "机动开支", "Dream基金", "投资转入"]);
+assert.deepEqual(JSON.parse(JSON.stringify(api.getState().categories.filter((item) => !item.parentId && item.isActive).map((item) => item.name))), ["收入", "固定开支", "生活开支", "机动开支", "Dream基金", "投资转入"]);
+assert.deepEqual(JSON.parse(JSON.stringify(api.getState().categories.filter((item) => item.parentId === "category-income" && item.isActive).map((item) => item.name))), ["工资", "小说", "UP主", "副业", "奖金", "利息/收益", "其他收入"]);
+assert.equal(initialInvestments[0].name, "个人基金");
 assert.equal(api.getState().dreamFunds.length, 4, "虚拟资金池包含短期、长期、本人投资本金和家庭公共资金");
 assert.equal(api.getState().allocationRules[0].fixedBps + api.getState().allocationRules[0].livingBps + api.getState().allocationRules[0].flexBps + api.getState().allocationRules[0].dreamBps + api.getState().allocationRules[0].investmentBps, 10000, "默认收入分配比例合计为100% ");
 

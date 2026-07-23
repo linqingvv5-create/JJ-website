@@ -344,7 +344,7 @@
             ${state.accounts.map((account) => {
               const holdings = state.holdings.filter((holding) => holding.accountId === account.id);
               const market = sum(holdings.map(marketValue)) + repoValue(account);
-              return `<div class="fund-account-row"><div><strong>${html(account.name)}</strong><span>市值 ${wholeCurrency(market)}${repoValue(account) ? ` · 含标准券 ${wholeCurrency(repoValue(account))}` : ""}</span></div><div><span>可用资金</span><strong>${wholeCurrency(account.availableCash)}</strong></div><button type="button" data-fund-transfer="${attr(account.id)}">转入/转出</button></div>`;
+              return `<div class="fund-account-row"><div><strong>${html(accountDisplayName(account))}</strong><span>市值 ${wholeCurrency(market)}${repoValue(account) ? ` · 含标准券 ${wholeCurrency(repoValue(account))}` : ""}</span></div><div><span>可用资金</span><strong>${wholeCurrency(account.availableCash)}</strong></div><button type="button" data-fund-transfer="${attr(account.id)}">转入/转出</button></div>`;
             }).join("")}
             <div class="fund-account-row bank-account-row"><div><strong>银行资金</strong><span>活期、大额存单等</span></div><div><span>当前合计</span><strong>${wholeCurrency(bankCash)}</strong></div><button type="button" data-edit-bank-funds>调整</button></div>
           </div>
@@ -378,7 +378,7 @@
     document.querySelector(".stock-modal-backdrop")?.remove();
     const backdrop = document.createElement("div");
     backdrop.className = "stock-modal-backdrop";
-    backdrop.innerHTML = `<form class="stock-modal ledger-modal"><div class="stock-modal-title"><strong>账本 · 记一笔</strong><button type="button" data-close-stock-modal>×</button></div><div class="stock-modal-grid"><label><span>日期</span><input name="date" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label><label><span>类型</span><select name="type"><option>支出</option><option>收入</option><option>转入</option><option>转出</option><option>利息</option></select></label><label><span>账户</span><select name="accountId">${state.accounts.map((account) => `<option value="${attr(account.id)}">${html(account.name)}</option>`).join("")}<option value="bank">银行资金</option></select></label><label><span>金额</span><input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required></label><label class="stock-modal-wide"><span>备注</span><input name="note" type="text" placeholder="用途或说明"></label></div><div class="stock-modal-actions"><button type="button" data-close-stock-modal>取消</button><button type="submit">保存</button></div></form>`;
+    backdrop.innerHTML = `<form class="stock-modal ledger-modal"><div class="stock-modal-title"><strong>账本 · 记一笔</strong><button type="button" data-close-stock-modal>×</button></div><div class="stock-modal-grid"><label><span>日期</span><input name="date" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label><label><span>类型</span><select name="type"><option>支出</option><option>收入</option><option>转入</option><option>转出</option><option>利息</option></select></label><label><span>账户</span><select name="accountId">${state.accounts.map((account) => `<option value="${attr(account.id)}">${html(accountDisplayName(account))}</option>`).join("")}<option value="bank">银行资金</option></select></label><label><span>金额</span><input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required></label><label class="stock-modal-wide"><span>备注</span><input name="note" type="text" placeholder="用途或说明"></label></div><div class="stock-modal-actions"><button type="button" data-close-stock-modal>取消</button><button type="submit">保存</button></div></form>`;
     document.body.appendChild(backdrop);
     document.body.classList.add("modal-open");
     const close = () => { backdrop.remove(); document.body.classList.remove("modal-open"); };
@@ -438,7 +438,7 @@
     return `
       <section class="account-group">
         <div class="account-group-head">
-          <div class="account-identity"><strong>${html(account.name)}</strong><span class="account-position-badge">仓位 ${percent(position, 1)}</span></div>
+          <div class="account-identity"><strong>${html(accountDisplayName(account))}</strong><span class="account-position-badge">仓位 ${percent(position, 1)}</span></div>
           <div class="account-inline-stat account-total"><span class="account-stat-label section-title">总资产</span><strong class="account-stat-value">${wholeCurrency(asset)}</strong></div>
           <div class="account-inline-stat account-market"><span class="account-stat-label section-title">市值</span><strong class="account-stat-value">${wholeCurrency(mv)}</strong></div>
           <div class="account-inline-stat account-pnl"><span class="account-stat-label section-title">总盈亏</span><strong class="account-stat-value ${profitClass(pnl)}">${signedWholeCurrency(pnl)}</strong></div>
@@ -1275,7 +1275,7 @@
     backdrop.className = "stock-modal-backdrop";
     backdrop.innerHTML = `
       <form class="stock-modal" aria-label="新增股票">
-        <div class="stock-modal-title"><strong>${html(account.name)} · 新增股票</strong><button type="button" data-close-stock-modal aria-label="关闭">×</button></div>
+        <div class="stock-modal-title"><strong>${html(accountDisplayName(account))} · 新增股票</strong><button type="button" data-close-stock-modal aria-label="关闭">×</button></div>
         <div class="stock-modal-grid">
           <label><span>股票名称</span><input name="name" required autocomplete="off" placeholder="例如：比亚迪"></label>
           <label><span>股票代码</span><input name="code" inputmode="numeric" autocomplete="off" placeholder="例如：002594"></label>
@@ -1340,7 +1340,7 @@
     backdrop.className = "stock-modal-backdrop";
     backdrop.innerHTML = `
       <form class="stock-modal bank-transfer-modal" aria-label="银行资金转入转出">
-        <div class="stock-modal-title"><strong>${html(account.name)} · 银行资金</strong><button type="button" data-close-stock-modal aria-label="关闭">×</button></div>
+        <div class="stock-modal-title"><strong>${html(accountDisplayName(account))} · 银行资金</strong><button type="button" data-close-stock-modal aria-label="关闭">×</button></div>
         <div class="bank-transfer-balance"><span>当前可用资金</span><strong>${wholeCurrency(account.availableCash)}</strong></div>
         <div class="stock-modal-grid bank-transfer-grid">
           <label><span>操作</span><select name="direction"><option value="in">转入</option><option value="out">转出</option></select></label>
@@ -1370,7 +1370,7 @@
         return;
       }
       account.availableCash = currentCash + (isTransferOut ? -amountValue : amountValue);
-      state.ledgerEntries.unshift(normalizeLedgerEntry({ id: `ledger-transfer-${Date.now()}`, date: new Date().toISOString().slice(0, 10), type: isTransferOut ? "转出" : "转入", accountId: account.id, accountName: account.name, amount: amountValue, note: "证券账户资金变动", createdAt: new Date().toISOString() }));
+      state.ledgerEntries.unshift(normalizeLedgerEntry({ id: `ledger-transfer-${Date.now()}`, date: new Date().toISOString().slice(0, 10), type: isTransferOut ? "转出" : "转入", accountId: account.id, accountName: accountDisplayName(account), amount: amountValue, note: "证券账户资金变动", createdAt: new Date().toISOString() }));
       saveState();
       close();
       renderHome();
@@ -1606,6 +1606,7 @@
   function integerValue(value) { return Math.max(0, Math.round(Number(value) || 0)); }
   function integerOrNull(value) { const parsed = numberOrNull(value); return parsed == null ? null : integerValue(parsed); }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function accountDisplayName(account) { return String(account?.id) === "family" ? "私募基金" : "个人基金"; }
   function html(value) { return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]); }
   function attr(value) { return html(value); }
 })();

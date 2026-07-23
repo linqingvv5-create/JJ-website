@@ -5,13 +5,13 @@ window.APP_DATA = {
     {
       id: "self",
       label: "",
-      name: "梦想号",
+      name: "个人基金",
       availableCash: 152549.76
     },
     {
       id: "family",
       label: "",
-      name: "私募号",
+      name: "私募基金",
       availableCash: 440384.19
     }
   ],
@@ -63,7 +63,7 @@ window.APP_DATA = {
       strategyType: "长期持有型",
       status: "波段持仓",
       risk: "家庭私募仓位以节奏控制为主，不追高加仓",
-      extraNote: "兴业证券家庭私募账户当前持有 1400 股。"
+      extraNote: "家庭私募基金当前持有 1400 股。"
     },
     {
       id: "family-600900",
@@ -559,8 +559,8 @@ window.APP_DATA = {
 // 2026-07-22 22:52 券商持仓截图快照。保留原有计划与历史，只校准当前账户和持仓。
 (function applyBrokerSnapshot() {
   const snapshotAccounts = {
-    self: { name: "华福证券（**1348）", availableCash: 844.63, repoBalance: 209000, repoShares: 2090, repoPrice: 100 },
-    family: { name: "兴业证券（**7977）", availableCash: 100743.14, repoBalance: 300000, repoShares: 0, repoPrice: 100 }
+    self: { name: "个人基金", availableCash: 844.63, repoBalance: 209000, repoShares: 2090, repoPrice: 100 },
+    family: { name: "私募基金", availableCash: 100743.14, repoBalance: 300000, repoShares: 0, repoPrice: 100 }
   };
   const snapshotHoldings = [
     { id: "self-002242", accountId: "self", name: "九阳股份", code: "002242", shares: 20000, availableShares: 20000, cost: 11.174, currentPrice: 8.190, marketValueOverride: 163800, floatingPnlOverride: -59784.86, floatingPnlAdjustment: -104.86 },
