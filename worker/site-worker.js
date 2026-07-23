@@ -345,7 +345,7 @@ async function readFinanceState(db, memberId = null, includeAll = false) {
   const accountBodies = parseBodies(accounts);
   const transactionBodies = parseBodies(transactions);
   const extension = parseBodies(extensions)[0] || {};
-  return { activeMemberId: includeAll ? null : memberId, state: canonicalizeFinanceState({ version: 2, updatedAt: updated?.results?.[0]?.value || null, members: parseBodies(members), accounts: includeAll ? accountBodies : accountBodies.filter((item) => visibleToMember(item, memberId)), categories: parseBodies(categories), transactions: includeAll ? transactionBodies : transactionBodies.filter((item) => visibleToMember(item, memberId)), dreamAnimals: parseBodies(animals), goals: parseBodies(goals), goalEntries: parseBodies(goalEntries), assetSnapshots: parseBodies(snapshots), investmentSummaries: parseBodies(investments), dreamFunds: Array.isArray(extension.dreamFunds) ? extension.dreamFunds : [], tags: Array.isArray(extension.tags) ? extension.tags : [], allocationRules: Array.isArray(extension.allocationRules) ? extension.allocationRules : [] }) };
+  return { activeMemberId: includeAll ? null : memberId, state: canonicalizeFinanceState({ version: 2, updatedAt: updated?.results?.[0]?.value || null, members: parseBodies(members), accounts: includeAll ? accountBodies : accountBodies.filter((item) => visibleToMember(item, memberId)), categories: parseBodies(categories), transactions: includeAll ? transactionBodies : transactionBodies.filter((item) => visibleToMember(item, memberId)), dreamAnimals: parseBodies(animals), goals: parseBodies(goals), goalEntries: parseBodies(goalEntries), assetSnapshots: parseBodies(snapshots), investmentSummaries: parseBodies(investments), dreamFunds: Array.isArray(extension.dreamFunds) ? extension.dreamFunds : [], tags: Array.isArray(extension.tags) ? extension.tags : [], allocationRules: Array.isArray(extension.allocationRules) ? extension.allocationRules : [], incomeAllocationRules: Array.isArray(extension.incomeAllocationRules) ? extension.incomeAllocationRules : [] }) };
 }
 
 function requireArray(state, key) {
@@ -370,7 +370,7 @@ async function writeFinanceState(request, db, memberId = null) {
   const goalEntries = Array.isArray(state.goalEntries) ? state.goalEntries : [];
   const snapshots = Array.isArray(state.assetSnapshots) ? state.assetSnapshots : [];
   const investments = Array.isArray(state.investmentSummaries) ? state.investmentSummaries : [];
-  const extensions = { dreamFunds: Array.isArray(state.dreamFunds) ? state.dreamFunds : [], tags: Array.isArray(state.tags) ? state.tags : [], allocationRules: Array.isArray(state.allocationRules) ? state.allocationRules : [] };
+  const extensions = { dreamFunds: Array.isArray(state.dreamFunds) ? state.dreamFunds : [], tags: Array.isArray(state.tags) ? state.tags : [], allocationRules: Array.isArray(state.allocationRules) ? state.allocationRules : [], incomeAllocationRules: Array.isArray(state.incomeAllocationRules) ? state.incomeAllocationRules : [] };
   await ensureFinanceSchema(db);
   const existing = (await readFinanceState(db, null, true)).state;
   const keepPrivateAccount = (item) => item.isShared !== true && (!memberId || privateOwner(item) !== memberId);

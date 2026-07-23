@@ -80,7 +80,7 @@
       ],
       categories: CATEGORY_SEEDS.map(([id, name, direction, parentId], index) => ({ id, name, direction, parentId, sortOrder: index + 1, isActive: true })),
       accounts: [
-        accountSeed("account-bank", "银行卡", "BANK", "member-me", bankBalance, true),
+        accountSeed("account-bank", "银行卡", "BANK", "member-me", bankBalance, true, "PRIVATE_FUND"),
         accountSeed("account-wechat", "微信", "WECHAT", "member-me", 0, true),
         accountSeed("account-alipay", "支付宝", "ALIPAY", "member-me", 0, true),
         accountSeed("account-cash", "现金", "CASH", "member-me", 0, true),
@@ -105,14 +105,31 @@
       investmentSummaries: [],
       dreamFunds: dreamFundSeeds(),
       tags: ["家庭公共", "个人消费", "可报销"],
-      allocationRules: [{ id: "rule-default", name: "家庭默认分配", fixedBps: 3000, livingBps: 3000, flexBps: 1000, dreamBps: 1000, investmentBps: 2000, livingBudgets: {} }],
+      allocationRules: [{ id: "rule-default", name: "家庭默认分配", fixedBps: 3000, livingBps: 3000, flexBps: 1000, dreamBps: 1000, investmentBps: 2000, incomeDreamBps: 3464, incomeLivingBps: 3938, incomeFamilyBps: 2598, livingBudgets: {} }],
+      incomeAllocationRules: defaultIncomeAllocationRules(),
       memberAssetSummaries: [],
       memberMonthlySummaries: []
     };
   }
 
-  function accountSeed(id, name, type, ownerMemberId, balanceCents, includeInFamilyAssets) {
-    return { id, name, type, ownerMemberId, openingBalanceCents: balanceCents, currentBalanceCents: balanceCents, includeInFamilyAssets, isShared: type === "FAMILY_SHARED", isArchived: false, updatedAt: new Date().toISOString() };
+  function accountSeed(id, name, type, ownerMemberId, balanceCents, includeInFamilyAssets, purpose = "GENERAL") {
+    return { id, name, type, ownerMemberId, purpose, openingBalanceCents: balanceCents, currentBalanceCents: balanceCents, includeInFamilyAssets, isShared: type === "FAMILY_SHARED", isArchived: false, updatedAt: new Date().toISOString() };
+  }
+
+  function defaultIncomeAllocationRules() {
+    const salary = [
+      { id: "salary-dream-long", destinationType: "DREAM_LONG", targetId: "dream-fund-long", bps: 3464 },
+      { id: "salary-family", destinationType: "FAMILY", targetId: "account-family", bps: 2598 },
+      { id: "salary-living", destinationType: "LIVING", targetId: "", bps: 3938 }
+    ];
+    const incomeCategories = CATEGORY_SEEDS.filter((item) => item[3] === "category-income");
+    return incomeCategories.map(([categoryId, name]) => ({
+      id: `income-rule-${categoryId}`,
+      name: `${name}分配`,
+      categoryId,
+      allocations: categoryId === "income-salary" ? salary.map((item) => ({ ...item })) : [{ id: `${categoryId}-living`, destinationType: "LIVING", targetId: "", bps: 10000 }],
+      isActive: true
+    }));
   }
 
   function dreamFundSeeds() {
@@ -346,15 +363,14 @@
             </div>
             <div class="journal-option-section">
               <div class="journal-option-title"><div><strong>标签</strong><span>用于给流水增加灵活标记</span></div><button class="finance-secondary" data-add-tag>＋ 标签</button></div>
-              <div class="settings-tags">${state.tags.map((tag) => `<span class="settings-tag"><b>${escapeHtml(tag)}</b><button type="button" data-edit-tag="${escapeAttribute(tag)}" aria-label="编辑${escapeAttribute(tag)}">编辑</button><button type="button" data-remove-tag="${escapeAttribute(tag)}" aria-label="删除${escapeAttribute(tag)}">×</button></span>`).join("") || empty("还没有标签")}</div>
+              <div class="settings-tags">${state.tags.map((tag) => `<span class="settings-tag"><b>${escapeHtml(tag)}</b><button type="button" data-edit-tag="${escapeAttribute(tag)}" aria-label="编辑${escapeAttribute(tag)}">☰</button><button type="button" data-remove-tag="${escapeAttribute(tag)}" aria-label="删除${escapeAttribute(tag)}">×</button></span>`).join("") || empty("还没有标签")}</div>
             </div>
             <div class="journal-option-section">
               <div class="journal-option-title"><div><strong>收付款账户</strong><span>决定“支付 / 转出账户”和“收入 / 转入账户”的选项</span></div><button class="finance-secondary" data-add-account="${escapeAttribute(currentMember()?.id || "")}">＋ 账户</button></div>
               <div class="settings-account-list">${editableAccounts.map(settingsAccountOptionRow).join("") || empty("还没有可用账户")}</div>
             </div>
           </section>
-          <section class="finance-panel settings-card"><div class="finance-panel-head"><div><strong>收入分配规则</strong><br><span>固定、生活、机动、Dream 与投资</span></div><button class="finance-secondary" data-edit-allocation-rule>编辑</button></div>${allocationRuleView(state.allocationRules[0])}</section>
-          <section class="finance-panel settings-card is-wide"><div class="finance-panel-head"><div><strong>Dream基金目标</strong><br><span>虚拟资金池，真实资金仍放在现有账户</span></div></div><div class="dream-fund-grid">${state.dreamFunds.map(dreamFundCard).join("")}</div></section>
+          <section class="finance-panel settings-card is-wide income-rule-card"><div class="finance-panel-head"><div><strong>收入分配规则</strong><br><span>不同收入类型使用不同模板，快速记账时自动套用</span></div><button class="finance-secondary" data-add-income-rule>＋ 规则</button></div><div class="income-rule-list">${state.incomeAllocationRules.filter((item) => item.isActive !== false).map(incomeRuleSettingsRow).join("") || empty("还没有收入分配规则")}</div></section>
           <section class="finance-panel settings-card"><div class="finance-panel-head"><div><strong>导入导出</strong><br><span>账本 CSV 备份与恢复</span></div></div><div class="finance-inline-actions"><button class="finance-secondary" data-export-csv>导出账本</button><button class="finance-secondary" data-import-csv>导入账本</button><input type="file" accept=".csv,text/csv" data-csv-file hidden></div></section>
           <section class="finance-panel settings-card"><div class="finance-panel-head"><div><strong>云同步</strong><br><span>${escapeHtml(syncText)}</span></div></div><p class="settings-copy">成员、账户、流水、Dream资金池与分配规则会跨设备保存。</p></section>
         </div>
@@ -414,16 +430,12 @@
     const month = monthlyAccountFlows(ledgerMonth);
     const white = state.members.find((item) => item.id === "member-me" || item.displayName.includes("白白")) || state.members[0];
     const pang = state.members.find((item) => item.id !== white?.id && item.isActive && item.displayName.includes("胖胖")) || state.members.find((item) => item.id !== white?.id && item.isActive);
-    const allFamilyAccounts = state.accounts.filter((item) => !item.isArchived && item.type !== "VIRTUAL_POOL" && (item.ownerMemberId === "family" || item.isShared));
-    const canonicalFamilyAccount = allFamilyAccounts.find((item) => item.id === "account-family") || allFamilyAccounts[0];
-    const familyAccounts = canonicalFamilyAccount ? [canonicalFamilyAccount] : [];
-    const familyMember = { id: "family", displayName: "家庭公共" };
+    const accountAnimals = accountGardenAnimals(white, pang);
     els.content.innerHTML = `
       <div class="finance-page">
         ${pageHead("Dream花园", "", `<button class="overview-ledger-entry" data-open-view="ledger">账本</button><button class="overview-ledger-entry" data-open-view="accounts">账户</button><button class="finance-primary" data-add-goal>＋ 目标</button>`)}
-        ${dreamGarden(goals, accountGardenAnimals(white, pang), false)}
-        ${dreamFundDetails()}
-        <div class="member-account-sections dream-family-accounts">${memberAccountSection(familyMember, familyAccounts, month, true, false, true)}</div>
+        ${dreamGarden(goals, accountAnimals, false)}
+        ${gardenAccountDetails(goals, accountAnimals, month)}
       </div>`;
   }
 
@@ -489,7 +501,16 @@
     const dreamAnimal = event.target.closest("[data-dream-animal]");
     if (dreamAnimal) {
       if (Date.now() < suppressDreamAnimalClickUntil) { event.preventDefault(); return; }
-      openDreamAnimalDetail(dreamAnimal.dataset.dreamAnimal); return;
+      const target = document.getElementById(`garden-account-${dreamAnimal.dataset.dreamAnimal}`);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        target.classList.remove("is-garden-focus");
+        window.requestAnimationFrame(() => target.classList.add("is-garden-focus"));
+        window.setTimeout(() => target.classList.remove("is-garden-focus"), 1400);
+      } else {
+        openDreamAnimalDetail(dreamAnimal.dataset.dreamAnimal);
+      }
+      return;
     }
     if (event.target.closest("[data-add-income]")) { openTransactionModal({ type: "INCOME", categoryId: "income-salary" }); return; }
     if (event.target.closest("[data-add-expense]")) { openTransactionModal({ type: "EXPENSE", categoryId: "expense-food" }); return; }
@@ -507,6 +528,11 @@
     const removeTag = event.target.closest("[data-remove-tag]");
     if (removeTag) { removeTagOption(removeTag.dataset.removeTag); return; }
     if (event.target.closest("[data-edit-allocation-rule]")) { openAllocationRuleModal(); return; }
+    if (event.target.closest("[data-add-income-rule]")) { openIncomeRuleModal(); return; }
+    const editIncomeRule = event.target.closest("[data-edit-income-rule]");
+    if (editIncomeRule) { openIncomeRuleModal(editIncomeRule.dataset.editIncomeRule); return; }
+    const removeIncomeRule = event.target.closest("[data-remove-income-rule]");
+    if (removeIncomeRule) { removeIncomeRuleOption(removeIncomeRule.dataset.removeIncomeRule); return; }
     const editDreamFund = event.target.closest("[data-edit-dream-fund]");
     if (editDreamFund) { openDreamFundModal(editDreamFund.dataset.editDreamFund); return; }
     const settleDreamFund = event.target.closest("[data-settle-dream-fund]");
@@ -678,12 +704,15 @@
     const updateFields = () => updateTransactionForm(form);
     typeSelect.addEventListener("change", updateFields);
     form.elements.primaryCategoryId.addEventListener("change", updateFields);
+    form.elements.categoryId.addEventListener("change", () => renderTransactionIncomeAllocations(form, true));
+    form.addEventListener("input", () => updateTransactionAllocationPreview(form));
     updateFields();
     if (prefill.categoryId) {
       const category = categoryById(prefill.categoryId);
       form.elements.primaryCategoryId.value = category?.parentId || category?.id || "category-living";
       updateFields();
       form.elements.categoryId.value = prefill.categoryId;
+      renderTransactionIncomeAllocations(form, true);
     }
     form.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -691,6 +720,7 @@
         const values = new FormData(form);
         const transaction = buildTransaction(values);
         applyTransaction(transaction);
+        if (transaction.type === "INCOME") applyIncomeAllocations(transaction);
         closeModal(modal);
         saveNow();
         render();
@@ -713,6 +743,10 @@
       <label><span>二级分类</span><select name="categoryId"></select></label>
       <label data-from-field><span>支付 / 转出账户</span><select name="fromAccountId"><option value="">请选择</option>${accountOptions(prefill.fromAccountId)}</select></label>
       <label data-to-field><span>收入 / 转入账户</span><select name="toAccountId"><option value="">请选择</option>${accountOptions(prefill.toAccountId)}</select></label>
+      <section class="income-allocation-panel is-wide" data-income-allocation>
+        <div class="income-allocation-head"><div><strong>这笔收入怎么分</strong><span>已按收入类型套用规则，本次可直接修改</span></div><b data-allocation-total>100%</b></div>
+        <div data-income-allocation-fields></div>
+      </section>
       <label><span>标签</span><select name="tag"><option value="">无标签</option>${state.tags.map((tag) => `<option value="${escapeAttribute(tag)}">${escapeHtml(tag)}</option>`).join("")}</select></label>
       <label class="is-wide"><span>备注</span><input name="note" type="text" value="${escapeAttribute(prefill.note || "")}" placeholder="用途或说明"></label>
       <div class="finance-form-actions"><button type="button" class="finance-secondary" data-close-finance-modal>取消</button><button type="submit" class="finance-primary">保存</button></div>
@@ -726,6 +760,7 @@
     const transfer = type === "TRANSFER";
     form.querySelector("[data-from-field]").hidden = incomeLike;
     form.querySelector("[data-to-field]").hidden = expenseLike;
+    form.querySelector("[data-income-allocation]").hidden = !incomeLike;
     const previousPrimaryId = form.elements.primaryCategoryId.value;
     const roots = state.categories.filter((item) => !item.parentId && item.isActive !== false && (incomeLike ? item.direction === "INCOME" : expenseLike ? item.direction !== "INCOME" : ["category-dream", "category-investment"].includes(item.id)));
     const defaultPrimaryId = incomeLike ? "category-income" : expenseLike ? "category-living" : "";
@@ -734,6 +769,30 @@
     const selectedCategory = form.elements.categoryId.value;
     const children = state.categories.filter((item) => item.parentId === primaryId && item.isActive !== false);
     form.elements.categoryId.innerHTML = primaryId ? (children.map((item) => `<option value="${escapeAttribute(item.id)}" ${item.id === selectedCategory ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("") || `<option value="${escapeAttribute(primaryId)}">未细分</option>`) : `<option value="">/</option>`;
+    if (incomeLike) renderTransactionIncomeAllocations(form, false);
+  }
+
+  function renderTransactionIncomeAllocations(form, force = false) {
+    const panel = form.querySelector("[data-income-allocation]");
+    if (!panel || form.elements.type.value !== "INCOME") return;
+    const categoryId = form.elements.categoryId.value;
+    if (!force && panel.dataset.ruleCategory === categoryId) { updateTransactionAllocationPreview(form); return; }
+    const rule = state.incomeAllocationRules.find((item) => item.isActive !== false && item.categoryId === categoryId);
+    const allocations = rule?.allocations?.length ? rule.allocations : [{ destinationType: "LIVING", targetId: "", bps: 10000 }];
+    panel.dataset.ruleCategory = categoryId;
+    panel.querySelector("[data-income-allocation-fields]").innerHTML = allocations.map((item) => `<label class="income-allocation-field"><span>${escapeHtml(incomeDestinationLabel(item))}</span><div><input name="incomeAllocationPercent" type="number" min="0" max="100" step="0.01" value="${(Number(item.bps || 0) / 100).toFixed(2)}" required><i>%</i><b data-allocation-amount>¥0.00</b></div><input type="hidden" name="incomeAllocationDestination" value="${escapeAttribute(`${item.destinationType}|${item.targetId || ""}`)}"></label>`).join("");
+    updateTransactionAllocationPreview(form);
+  }
+
+  function updateTransactionAllocationPreview(form) {
+    const panel = form.querySelector("[data-income-allocation]");
+    if (!panel || panel.hidden) return;
+    const amountCents = Math.max(0, Math.round(Number(form.elements.amount.value || 0) * 100));
+    const percents = [...form.querySelectorAll('[name="incomeAllocationPercent"]')].map((item) => Number(item.value) || 0);
+    const total = sum(percents);
+    panel.querySelector("[data-allocation-total]").textContent = `${total.toFixed(2).replace(/\.00$/, "")}%`;
+    panel.classList.toggle("has-error", Math.abs(total - 100) > 0.001);
+    [...panel.querySelectorAll("[data-allocation-amount]")].forEach((item, index) => { item.textContent = money(Math.round(amountCents * percents[index] / 100)); });
   }
 
   function buildTransaction(values) {
@@ -743,12 +802,21 @@
     const toAccountId = String(values.get("toAccountId") || "");
     const ownerMemberId = String(values.get("ownerMemberId") || "family");
     const linkedGoal = goalById(String(values.get("goalId") || ""));
+    const allocationDestinations = values.getAll("incomeAllocationDestination").map(String);
+    const allocationPercents = values.getAll("incomeAllocationPercent").map((item) => Number(item));
     if (!Number.isFinite(amountCents) || amountCents <= 0) throw new Error("请输入正确金额。");
     if (type === "EXPENSE" && linkedGoal?.kind === "GOOSE") throw new Error("鹅代表不可动用本金的退休池，不能记录支出。");
     if (type === "EXPENSE" && !fromAccountId) throw new Error("支出必须选择支付账户。");
     if (["INCOME", "REFUND", "REIMBURSEMENT", "BALANCE_ADJUSTMENT"].includes(type) && !toAccountId) throw new Error("请选择资金进入的账户。");
     if (type === "TRANSFER" && (!fromAccountId || !toAccountId)) throw new Error("转账必须同时选择转出账户和转入账户。");
     if (type === "TRANSFER" && fromAccountId === toAccountId) throw new Error("转出和转入账户不能相同。");
+    if (type === "INCOME" && (!allocationDestinations.length || Math.abs(sum(allocationPercents) - 100) > 0.001)) throw new Error("收入分配比例合计必须等于 100%。");
+    const incomeAllocations = type === "INCOME" ? allocationDestinations.map((value, index) => {
+      const [destinationType, targetId = ""] = value.split("|");
+      const bps = Math.round(allocationPercents[index] * 100);
+      return { id: uid("income-allocation"), destinationType, targetId, bps, amountCents: index === allocationDestinations.length - 1 ? 0 : Math.round(amountCents * bps / 10000) };
+    }) : [];
+    if (incomeAllocations.length) incomeAllocations[incomeAllocations.length - 1].amountCents = amountCents - sum(incomeAllocations.slice(0, -1).map((item) => item.amountCents));
     return {
       id: uid("transaction"),
       occurredAt: new Date(String(values.get("occurredAt"))).toISOString(),
@@ -768,9 +836,70 @@
       tag: String(values.get("tag") || ""),
       note: String(values.get("note") || "").trim(),
       splitAllocations: [],
+      incomeAllocations,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+  }
+
+  function applyIncomeAllocations(income) {
+    const sourceAccountId = income.toAccountId;
+    (income.incomeAllocations || []).forEach((allocation) => {
+      const amountCents = Math.max(0, Number(allocation.amountCents) || 0);
+      if (!amountCents || allocation.destinationType === "LIVING") return;
+      let targetAccountId = allocation.targetId;
+      let categoryId = "";
+      let goalId = "";
+      if (allocation.destinationType === "FAMILY") targetAccountId = allocation.targetId || "account-family";
+      if (allocation.destinationType === "DREAM_SHORT") {
+        const fund = state.dreamFunds.find((item) => item.id === allocation.targetId) || state.dreamFunds.find((item) => item.type === "SHORT");
+        targetAccountId = fund?.storageAccountId || sourceAccountId;
+        categoryId = "dream-short";
+        updateDreamFundAllocation(fund, amountCents);
+        goalId = state.goals.find((item) => item.kind === "CHICKEN" && !item.isArchived && item.status !== "CLOSED")?.id || "";
+      }
+      if (allocation.destinationType === "DREAM_LONG") {
+        const fund = state.dreamFunds.find((item) => item.id === allocation.targetId) || state.dreamFunds.find((item) => item.type === "LONG");
+        targetAccountId = accountById("account-securities-self") ? "account-securities-self" : fund?.storageAccountId || sourceAccountId;
+        categoryId = "dream-long";
+        updateDreamFundAllocation(fund, amountCents);
+        goalId = state.goals.find((item) => item.kind === "DUCK" && !item.isArchived && item.status !== "CLOSED")?.id || "";
+      }
+      if (allocation.destinationType === "RETIREMENT") {
+        goalId = allocation.targetId || state.goals.find((item) => item.kind === "GOOSE" && item.status !== "CLOSED")?.id || "";
+        targetAccountId = accountById("account-securities-self") ? "account-securities-self" : sourceAccountId;
+        categoryId = "category-investment";
+      }
+      if (!targetAccountId || targetAccountId === sourceAccountId) {
+        if (goalId) updateGoalAllocationWithoutTransfer(goalId, amountCents, income.id);
+        return;
+      }
+      applyTransaction({
+        id: uid("allocation-transfer"), occurredAt: income.occurredAt, type: "TRANSFER", amountCents, categoryId,
+        fromAccountId: sourceAccountId, toAccountId: targetAccountId, bookkeeperMemberId: income.bookkeeperMemberId,
+        payerMemberId: income.payerMemberId, ownership: allocation.destinationType === "FAMILY" ? "FAMILY" : income.ownership,
+        ownerMemberId: income.ownerMemberId, isShared: allocation.destinationType === "FAMILY", includeInFamilyStats: false,
+        goalId, merchant: "", tag: income.tag || "", note: `收入自动分配 · ${incomeDestinationLabel(allocation)}`,
+        splitAllocations: [], sourceIncomeId: income.id, incomeAllocationType: allocation.destinationType, skipVirtualAllocation: true,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      });
+    });
+  }
+
+  function updateDreamFundAllocation(fund, amountCents) {
+    if (!fund) return;
+    fund.currentBalanceCents += amountCents;
+    fund.annualTransferCents += amountCents;
+    fund.updatedAt = new Date().toISOString();
+  }
+
+  function updateGoalAllocationWithoutTransfer(goalId, amountCents, transactionId) {
+    const goal = goalById(goalId);
+    if (!goal) return;
+    goal.allocatedAmountCents += amountCents;
+    goal.principalCents += amountCents;
+    goal.updatedAt = new Date().toISOString();
+    addGoalEntry(goal.id, "ALLOCATION", amountCents, transactionId);
   }
 
   function applyTransaction(transaction) {
@@ -787,7 +916,7 @@
     if (from) from.updatedAt = new Date().toISOString();
     if (to) to.updatedAt = new Date().toISOString();
     const rootCategory = topCategoryId(transaction.categoryId);
-    if (rootCategory === "category-dream") {
+    if (rootCategory === "category-dream" && !transaction.skipVirtualAllocation) {
       const short = ["dream-short", "dream-travel", "dream-device", "dream-study"].includes(transaction.categoryId);
       const fund = state.dreamFunds.find((item) => item.type === (short ? "SHORT" : "LONG"));
       if (fund) {
@@ -832,11 +961,13 @@
     const owner = state.members.find((item) => item.id === ownerId) || currentMember();
     const ownerLabel = ownerId === "family" ? "家庭成员" : owner?.displayName || "本人";
     const typeChoices = [["BANK","银行卡"],["WECHAT","微信"],["ALIPAY","支付宝"],["CASH","现金"],["CREDIT_CARD","信用卡"],["FAMILY_SHARED","家庭公共账户"],["FUND","基金账户"],["OTHER","其他账户"]];
+    const purposeChoices = [["GENERAL","普通资产"],["LIVING","个人生活账户"],["PRIVATE_FUND","私募资金（可暂存在银行卡）"],["FAMILY","家庭公共资金"],["DREAM","Dream真实存放账户"]];
     const ownerChoices = [...state.members.filter((item) => item.isActive).map((item) => [item.id, item.displayName]), ["family", "家庭公共"]];
     const modal = createModal(existing ? "编辑账户" : "添加账户", `<form class="finance-form">
       <label class="is-wide"><span>账户名称（选填）</span><input name="name" value="${escapeAttribute(existing ? cleanAccountDisplayName(existing) : "")}" placeholder="留空时自动显示账户类型，例如“银行卡”"></label>
       <label><span>账户类型</span><select name="type">${optionList(typeChoices, existing?.type || "BANK")}</select></label>
       <label><span>这个账户属于谁</span><select name="ownerMemberId">${optionList(ownerChoices, ownerId)}</select></label>
+      <label><span>资金用途</span><select name="purpose">${optionList(purposeChoices, existing?.purpose || (existing?.id === "account-bank" ? "PRIVATE_FUND" : "GENERAL"))}</select><small class="finance-field-help">用途决定它归入生活、投资或家庭公共统计。</small></label>
       ${existing ? "" : `<label><span>初始余额（元）</span><input name="balance" type="number" step="0.01" value="0" required></label>`}
       <label><span>谁可以查看</span><select name="isShared"><option value="false" ${!existing?.isShared ? "selected" : ""}>仅${escapeHtml(ownerLabel)}查看</option><option value="true" ${existing?.isShared ? "selected" : ""}>家庭成员都能查看</option></select><small class="finance-field-help">只影响家人能否看到明细。</small></label>
       <label><span>首页总资产是否包含它</span><select name="include"><option value="true" ${existing?.includeInFamilyAssets !== false ? "selected" : ""}>包含在家庭总资产中</option><option value="false" ${existing?.includeInFamilyAssets === false ? "selected" : ""}>不加入总资产统计</option></select><small class="finance-field-help">一般银行卡、微信、现金选择“包含”。</small></label>
@@ -850,12 +981,12 @@
       const type = String(values.get("type"));
       const name = String(values.get("name") || "").trim() || accountTypeName(type);
       if (existing) {
-        existing.name = name; existing.type = type; existing.ownerMemberId = String(values.get("ownerMemberId"));
+        existing.name = name; existing.type = type; existing.ownerMemberId = String(values.get("ownerMemberId")); existing.purpose = String(values.get("purpose") || "GENERAL");
         existing.isShared = String(values.get("isShared")) === "true"; existing.includeInFamilyAssets = String(values.get("include")) === "true"; existing.isArchived = String(values.get("isArchived")) === "true"; existing.updatedAt = new Date().toISOString();
       } else {
         const balance = Math.round(Number(values.get("balance")) * 100);
         const account = accountSeed(uid("account"), name, type, String(values.get("ownerMemberId")), Number.isFinite(balance) ? balance : 0, String(values.get("include")) === "true");
-        account.isShared = String(values.get("isShared")) === "true"; state.accounts.push(account);
+        account.isShared = String(values.get("isShared")) === "true"; account.purpose = String(values.get("purpose") || "GENERAL"); state.accounts.push(account);
       }
       closeModal(modal); saveNow(); render(); showToast(existing ? "账户已更新" : "账户已添加");
     });
@@ -977,6 +1108,58 @@
     modal.querySelector("form").addEventListener("submit", (event) => { event.preventDefault(); const values = new FormData(event.currentTarget); const keys = ["fixed","living","flex","dream","investment"]; const total = sum(keys.map((key) => Number(values.get(key)))); if (total !== 100) { window.alert("五项分配比例合计必须等于 100%。"); return; } const next = { id: rule.id || "rule-default", name: "家庭默认分配", livingBudgets: {} }; keys.forEach((key) => { next[`${key}Bps`] = Math.round(Number(values.get(key)) * 100); }); next.livingBudgets[currentMember()?.id] = Math.round(Number(values.get("meBudget")) * 100) || 0; if (partnerMember()?.id) next.livingBudgets[partnerMember().id] = Math.round(Number(values.get("partnerBudget")) * 100) || 0; next.livingBudgets.family = Math.round(Number(values.get("familyBudget")) * 100) || 0; state.allocationRules = [next]; closeModal(modal); saveNow(); renderSettings(); });
   }
 
+  function openIncomeRuleModal(ruleId = "") {
+    const existing = state.incomeAllocationRules.find((item) => item.id === ruleId);
+    const incomeCategories = state.categories.filter((item) => item.parentId === "category-income" && item.isActive !== false);
+    const initialAllocations = existing?.allocations?.length ? existing.allocations : [{ id: uid("allocation"), destinationType: "LIVING", targetId: "", bps: 10000 }];
+    const modal = createModal(existing ? "编辑收入分配规则" : "新增收入分配规则", `<form class="finance-form income-rule-form">
+      <label class="is-wide"><span>收入类型</span><select name="categoryId">${incomeCategories.map((item) => `<option value="${escapeAttribute(item.id)}" ${item.id === existing?.categoryId ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}</select></label>
+      <div class="is-wide income-rule-editor">
+        <div class="income-rule-editor-head"><span>资金去向与比例</span><button type="button" class="finance-secondary" data-add-rule-allocation>＋ 去向</button></div>
+        <div data-rule-allocation-rows>${initialAllocations.map(incomeRuleAllocationRow).join("")}</div>
+        <small>所有去向合计必须为 100%。同一收入类型只启用一套模板。</small>
+      </div>
+      <div class="finance-form-actions"><button type="button" class="finance-secondary" data-close-finance-modal>取消</button><button class="finance-primary" type="submit">保存规则</button></div>
+    </form>`);
+    const rows = modal.querySelector("[data-rule-allocation-rows]");
+    modal.addEventListener("click", (event) => {
+      if (event.target.closest("[data-add-rule-allocation]")) {
+        rows.insertAdjacentHTML("beforeend", incomeRuleAllocationRow({ id: uid("allocation"), destinationType: "ACCOUNT", targetId: state.accounts.find((item) => !item.isArchived)?.id || "", bps: 0 }));
+      }
+      const remove = event.target.closest("[data-remove-rule-allocation]");
+      if (remove && rows.children.length > 1) remove.closest(".income-rule-allocation-row")?.remove();
+    });
+    modal.querySelector("form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const values = new FormData(event.currentTarget);
+      const destinations = values.getAll("allocationDestination").map(String);
+      const percentages = values.getAll("allocationPercent").map((item) => Number(item));
+      const allocations = destinations.map((value, index) => {
+        const [destinationType, targetId = ""] = value.split("|");
+        return { id: existing?.allocations?.[index]?.id || uid("allocation"), destinationType, targetId, bps: Math.round(percentages[index] * 100) };
+      }).filter((item) => item.bps > 0);
+      if (!allocations.length || sum(allocations.map((item) => item.bps)) !== 10000) { window.alert("所有分配比例合计必须等于 100%。"); return; }
+      const categoryId = String(values.get("categoryId"));
+      state.incomeAllocationRules.forEach((item) => { if (item.id !== existing?.id && item.categoryId === categoryId) item.isActive = false; });
+      const fields = { name: `${categoryName(categoryId)}分配`, categoryId, allocations, isActive: true };
+      if (existing) Object.assign(existing, fields);
+      else state.incomeAllocationRules.push({ id: uid("income-rule"), ...fields });
+      closeModal(modal); saveNow(); renderSettings(); showToast(existing ? "收入分配规则已更新" : "收入分配规则已添加");
+    });
+  }
+
+  function removeIncomeRuleOption(ruleId) {
+    const rule = state.incomeAllocationRules.find((item) => item.id === ruleId);
+    if (!rule || !window.confirm(`停用“${categoryName(rule.categoryId) || rule.name}”的收入分配规则？`)) return;
+    rule.isActive = false;
+    saveNow(); renderSettings(); showToast("收入分配规则已停用");
+  }
+
+  function incomeRuleAllocationRow(allocation) {
+    const selected = `${allocation.destinationType}|${allocation.targetId || ""}`;
+    return `<div class="income-rule-allocation-row"><select name="allocationDestination">${incomeDestinationOptions(selected)}</select><label><input name="allocationPercent" type="number" min="0" max="100" step="0.01" value="${(Number(allocation.bps || 0) / 100).toFixed(2)}" required><span>%</span></label><button type="button" data-remove-rule-allocation aria-label="删除去向">×</button></div>`;
+  }
+
   function openDreamFundModal(fundId) {
     const fund = state.dreamFunds.find((item) => item.id === fundId); if (!fund) return;
     const modal = createModal(`编辑${fund.name}`, `<form class="finance-form"><label class="is-wide"><span>基金名称</span><input name="name" value="${escapeAttribute(fund.name)}" required></label><label><span>类型</span><select name="type">${optionList([["SHORT","短期"],["LONG","长期"],["INVESTMENT","投资本金"],["FAMILY","家庭公共"]], fund.type)}</select></label><label><span>真实存放账户</span><select name="storageAccountId">${accountOptions(fund.storageAccountId)}</select></label><label><span>年初余额（元）</span><input name="opening" type="number" step="0.01" value="${(fund.openingBalanceCents / 100).toFixed(2)}"></label><label><span>当前余额（元）</span><input name="current" type="number" step="0.01" value="${(fund.currentBalanceCents / 100).toFixed(2)}"></label><label><span>年度收益率（%）</span><input name="yield" type="number" step="0.01" value="${(fund.annualYieldBps / 100).toFixed(2)}"></label><label class="is-wide"><span>目标用途</span><input name="purpose" value="${escapeAttribute(fund.purpose || "")}"></label><label class="is-wide"><span>备注</span><input name="note" value="${escapeAttribute(fund.note || "")}"></label><div class="finance-form-actions"><button type="button" class="finance-secondary" data-close-finance-modal>取消</button><button class="finance-primary" type="submit">保存资金池</button></div></form>`);
@@ -1055,38 +1238,40 @@
     const pangpangIncome = incomeFor(partner?.id);
     const monthIncome = sum(incomeRows.map((item) => item.amountCents));
     const allocationRows = monthRows.filter((item) => ["EXPENSE", "TRANSFER"].includes(item.type));
+    const manualAllocationRows = allocationRows.filter((item) => !item.sourceIncomeId);
     const monthlyDreamTransfer = sum(monthRows.filter((item) => item.type === "TRANSFER" && topCategoryId(item.categoryId) === "category-dream").map((item) => item.amountCents));
     const monthlyDreamExpense = sum(monthRows.filter((item) => item.type === "EXPENSE" && topCategoryId(item.categoryId) === "category-dream").map((item) => item.amountCents));
     const allocation = (rootId) => sum(allocationRows.filter((item) => topCategoryId(item.categoryId) === rootId).map((item) => item.amountCents));
     const familyTransfers = allocationRows.filter((item) => item.type === "TRANSFER" && accountById(item.toAccountId)?.ownerMemberId === "family");
+    const manualFamilyTransfers = manualAllocationRows.filter((item) => item.type === "TRANSFER" && accountById(item.toAccountId)?.ownerMemberId === "family");
     const distributionFor = (key) => {
       const matches = (item) => ownerOf(item) === key;
       const income = sum(incomeRows.filter(matches).map((item) => item.amountCents));
-      const dream = sum(allocationRows.filter((item) => item.type === "TRANSFER" && topCategoryId(item.categoryId) === "category-dream" && matches(item)).map((item) => item.amountCents));
-      const living = sum(allocationRows.filter((item) => item.type === "TRANSFER" && topCategoryId(item.categoryId) === "category-living" && matches(item)).map((item) => item.amountCents));
-      const family = sum(familyTransfers.filter(matches).map((item) => item.amountCents));
+      const allocated = (types) => sum(incomeRows.filter(matches).flatMap((item) => item.incomeAllocations || []).filter((item) => types.includes(item.destinationType)).map((item) => item.amountCents));
+      const dream = allocated(["DREAM_SHORT", "DREAM_LONG", "RETIREMENT"]) + sum(manualAllocationRows.filter((item) => item.type === "TRANSFER" && topCategoryId(item.categoryId) === "category-dream" && matches(item)).map((item) => item.amountCents));
+      const living = allocated(["LIVING"]) + sum(manualAllocationRows.filter((item) => item.type === "TRANSFER" && topCategoryId(item.categoryId) === "category-living" && matches(item)).map((item) => item.amountCents));
+      const family = allocated(["FAMILY"]) + sum(manualFamilyTransfers.filter(matches).map((item) => item.amountCents));
       return { income, dream, living, family, total: dream + living + family };
     };
     const whiteDistribution = distributionFor(me?.id);
     const partnerDistribution = distributionFor(partner?.id);
     const familyDistribution = distributionFor("family");
-    const cashAccounts = state.accounts.filter((item) => !item.isArchived && item.includeInFamilyAssets && !["CREDIT_CARD", "SECURITIES", "VIRTUAL_POOL"].includes(item.type));
+    const investmentCashAccounts = state.accounts.filter((item) => !item.isArchived && item.includeInFamilyAssets && item.purpose === "PRIVATE_FUND" && !["CREDIT_CARD", "SECURITIES", "VIRTUAL_POOL"].includes(item.type));
+    const cashAccounts = state.accounts.filter((item) => !item.isArchived && item.includeInFamilyAssets && item.purpose !== "PRIVATE_FUND" && !["CREDIT_CARD", "SECURITIES", "VIRTUAL_POOL"].includes(item.type));
     const cashAssets = sum(cashAccounts.map((item) => item.currentBalanceCents));
-    const investmentAssets = sum(investments.map((item) => item.totalAssetCents));
-    const memberCash = (memberId) => sum(state.accounts.filter((item) => !item.isArchived && item.ownerMemberId === memberId && !["CREDIT_CARD", "SECURITIES", "VIRTUAL_POOL"].includes(item.type)).map((item) => item.currentBalanceCents));
-    const partnerInvestment = sum(investments.filter((item) => item.ownerMemberId === partner?.id || item.investmentAccountId === partner?.id).map((item) => item.totalAssetCents));
+    const investmentCashAssets = sum(investmentCashAccounts.map((item) => item.currentBalanceCents));
+    const investmentAssets = sum(investments.map((item) => item.totalAssetCents)) + investmentCashAssets;
+    const memberCash = (memberId) => sum(state.accounts.filter((item) => !item.isArchived && item.ownerMemberId === memberId && item.purpose !== "PRIVATE_FUND" && !["CREDIT_CARD", "SECURITIES", "VIRTUAL_POOL"].includes(item.type)).map((item) => item.currentBalanceCents));
+    const partnerInvestment = sum(investments.filter((item) => item.ownerMemberId === partner?.id || item.investmentAccountId === partner?.id).map((item) => item.totalAssetCents)) + sum(investmentCashAccounts.filter((item) => item.ownerMemberId === partner?.id).map((item) => item.currentBalanceCents));
     const whiteInvestment = Math.max(0, investmentAssets - partnerInvestment);
     const whiteCash = memberCash(me?.id);
     const partnerCash = memberCash(partner?.id);
     const liabilities = Math.abs(sum(state.accounts.filter((item) => !item.isArchived && item.type === "CREDIT_CARD" && item.currentBalanceCents < 0).map((item) => item.currentBalanceCents)));
     const dreamShort = sum(state.dreamFunds.filter((item) => item.type === "SHORT").map((item) => item.currentBalanceCents));
     const dreamLong = sum(state.dreamFunds.filter((item) => item.type === "LONG").map((item) => item.currentBalanceCents));
-    const livingSpentFor = (ownerId) => sum(monthRows.filter((item) => item.type === "EXPENSE" && topCategoryId(item.categoryId) === "category-living" && (item.ownerMemberId || item.payerMemberId) === ownerId).map((item) => item.amountCents));
-    const rule = state.allocationRules[0] || { livingBudgets: {} };
-    const availableFor = (ownerId) => sum(state.accounts.filter((item) => !item.isArchived && item.ownerMemberId === ownerId && !["CREDIT_CARD", "SECURITIES", "VIRTUAL_POOL"].includes(item.type)).map((item) => item.currentBalanceCents));
     const monthlyExpenseFor = (ownerId) => sum(monthRows.filter((item) => item.type === "EXPENSE" && ownerOf(item) === ownerId).map((item) => item.amountCents));
-    const livingSurplusFor = (ownerId) => Math.max(0, Number(rule.livingBudgets?.[ownerId]) || 0) - livingSpentFor(ownerId);
-    const spendingFor = (label, ownerId) => ({ label, expense: monthlyExpenseFor(ownerId), livingSurplus: livingSurplusFor(ownerId), accountSurplus: availableFor(ownerId) });
+    const monthlyLivingAllocatedFor = (ownerId) => sum(incomeRows.filter((item) => ownerOf(item) === ownerId).flatMap((item) => item.incomeAllocations || []).filter((item) => item.destinationType === "LIVING").map((item) => item.amountCents));
+    const spendingFor = (label, ownerId) => ({ label, expense: monthlyExpenseFor(ownerId), livingSurplus: monthlyLivingAllocatedFor(ownerId) - monthlyExpenseFor(ownerId), accountSurplus: livingAccountBalanceFor(ownerId) });
     const monthlySpending = [spendingFor("白白", me?.id), spendingFor("胖胖", partner?.id), spendingFor("家庭公共", "family")];
     const categoryBlueprints = [
       { label: "交通", icon: "🚇", keywords: ["交通", "通勤"] },
@@ -1150,6 +1335,13 @@
     return `<div class="destination-chart-grid">${destinationChartGroup("储蓄去向", "💰", groups.savings, "is-saving")}${destinationChartGroup("消费归属", "👥", groups.people, "is-people")}${destinationChartGroup("消费类别", "🧾", groups.categories, "is-categories")}</div>`;
   }
   function accountGroupTotal(accounts) { return sum(accounts.filter((item) => item.type !== "CREDIT_CARD" && item.type !== "VIRTUAL_POOL").map((item) => item.currentBalanceCents)); }
+  function livingAccountBalanceFor(ownerId) {
+    const ownerOf = (item) => item.ownerMemberId || item.payerMemberId || item.bookkeeperMemberId || "family";
+    const incomeAllocated = sum(state.transactions.filter((item) => ["INCOME", "REFUND", "REIMBURSEMENT"].includes(item.type) && ownerOf(item) === ownerId).flatMap((item) => item.incomeAllocations || []).filter((item) => item.destinationType === "LIVING").map((item) => item.amountCents));
+    const legacyAllocated = sum(state.transactions.filter((item) => item.type === "TRANSFER" && !item.sourceIncomeId && ownerOf(item) === ownerId && topCategoryId(item.categoryId) === "category-living").map((item) => item.amountCents));
+    const spent = sum(state.transactions.filter((item) => item.type === "EXPENSE" && ownerOf(item) === ownerId).map((item) => item.amountCents));
+    return incomeAllocated + legacyAllocated - spent;
+  }
   function accountInterest(accounts) {
     const ids = new Set(accounts.map((item) => item.id));
     return sum(state.transactions.filter((item) => ["INCOME", "REFUND", "REIMBURSEMENT"].includes(item.type) && ids.has(item.toAccountId) && `${categoryName(item.categoryId)} ${item.note || ""}`.match(/利息|收益|分红/)).map((item) => item.amountCents));
@@ -1159,7 +1351,7 @@
     const rule = state.allocationRules[0] || { livingBudgets: {} };
     const make = (id, kind, icon, name, description, ownerId) => {
       const accounts = accountsFor(ownerId);
-      const currentAmountCents = accountGroupTotal(accounts);
+      const currentAmountCents = ownerId === "family" ? accountGroupTotal(accounts) : livingAccountBalanceFor(ownerId);
       const budget = Number(rule.livingBudgets?.[ownerId]) || 0;
       return { id, kind, icon, name, description, isAccountAnimal: true, currentAmountCents, targetAmountCents: budget || Math.max(currentAmountCents, 1), earningsCents: accountInterest(accounts), eggSourceId: accounts[0]?.id || "" };
     };
@@ -1181,7 +1373,7 @@
   function dreamGarden(goals, accountAnimals = [], showHeader = true) {
     const weights = { GOOSE: 0, DUCK: 1, CHICKEN: 2, PIGEON: 3, MAGPIE: 4, PUPA: 5 };
     const ordered = [...goals, ...accountAnimals].sort((a, b) => weights[a.kind] - weights[b.kind]);
-    return `<section class="finance-panel dream-garden">${showHeader ? `<div class="finance-panel-head"><div><strong>家庭 Dream 花园</strong><br><span>存得越多，动物从灰色慢慢变成彩色</span></div><button class="finance-secondary" data-add-goal>＋ 愿望</button></div>` : ""}<div class="dream-garden-scene"><div class="dream-sun">☀</div><div class="dream-cloud dream-cloud-one">☁</div><div class="dream-cloud dream-cloud-two">☁</div><div class="dream-tree dream-tree-one">🌳</div><div class="dream-tree dream-tree-two">🌳</div><div class="dream-pond"></div><div class="dream-path"></div><div class="dream-fence">╫ ╫ ╫ ╫ ╫ ╫ ╫ ╫</div>${ordered.map((animal, index) => dreamGardenAnimal(animal, index)).join("")}</div></section>`;
+    return `<section class="finance-panel dream-garden">${showHeader ? `<div class="finance-panel-head"><div><strong>家庭 Dream 花园</strong><br><span>存得越多，动物从灰色慢慢变成彩色</span></div><button class="finance-secondary" data-add-goal>＋ 愿望</button></div>` : ""}<div class="dream-garden-scene"><div class="dream-sun">☀</div><div class="dream-cloud dream-cloud-one">☁</div><div class="dream-cloud dream-cloud-two">☁</div><div class="dream-tree dream-tree-one">🌳</div><div class="dream-tree dream-tree-two">🌳</div><div class="dream-pond"></div><div class="dream-fence">╫ ╫ ╫ ╫ ╫ ╫ ╫ ╫</div>${ordered.map((animal, index) => dreamGardenAnimal(animal, index)).join("")}</div></section>`;
   }
   function dreamGardenAnimal(goal, index) {
     const ratio = goal.targetAmountCents > 0 ? Math.min(100, Math.max(0, goal.currentAmountCents / goal.targetAmountCents * 100)) : 0;
@@ -1260,15 +1452,41 @@
     saveNow(); renderDreams(); showToast("动物已从花园删除");
   }
   function accountGroup(title, accounts, flows, ownerId) { return `<section class="finance-panel account-group"><div class="finance-panel-head"><div><strong>${escapeHtml(title)}</strong><br><span>${accounts.length} 个账户 · ${money(accountGroupTotal(accounts))}</span></div><button class="finance-secondary" data-member-account-detail="${escapeAttribute(ownerId || "")}">查看明细</button></div><div class="finance-account-list">${accounts.length ? accounts.map((account) => accountRow(account, flows[account.id], true)).join("") : empty("暂未添加账户")}</div></section>`; }
-  function settingsMemberRow(member) { return `<div class="settings-row"><div><span>${escapeHtml(member.role)}</span><strong>${escapeHtml(member.displayName)}${member.isCurrentUser ? " · 当前" : ""}</strong><small>${member.includeInFamilyAssets !== false ? "计入家庭资产" : "不计家庭资产"} · ${member.participatesInFamilyLedger !== false ? "参与公共账本" : "不参与公共账本"}</small></div><div class="finance-inline-actions"><button class="finance-secondary" data-edit-member="${escapeAttribute(member.id)}">编辑</button>${member.isCurrentUser ? "" : `<button class="finance-secondary is-danger" data-delete-member="${escapeAttribute(member.id)}">删除</button>`}</div></div>`; }
+  function settingsMemberRow(member) { return `<div class="settings-row"><div><span>${escapeHtml(member.role)}</span><strong>${escapeHtml(member.displayName)}${member.isCurrentUser ? " · 当前" : ""}</strong><small>${member.includeInFamilyAssets !== false ? "计入家庭资产" : "不计家庭资产"} · ${member.participatesInFamilyLedger !== false ? "参与公共账本" : "不参与公共账本"}</small></div><div class="finance-inline-actions"><button class="finance-secondary settings-icon-button" data-edit-member="${escapeAttribute(member.id)}" aria-label="编辑${escapeAttribute(member.displayName)}">☰</button>${member.isCurrentUser ? "" : `<button class="finance-secondary is-danger" data-delete-member="${escapeAttribute(member.id)}">×</button>`}</div></div>`; }
   function settingsCategoryGroup(root) {
     const children = state.categories.filter((item) => item.parentId === root.id && item.isActive !== false);
     const direction = root.direction === "INCOME" ? "收入" : root.direction === "EXPENSE" ? "支出" : "收支 / 转账";
-    return `<section class="settings-category-group"><div class="settings-category-root"><div><strong>${escapeHtml(root.name)}</strong><small>${direction}</small></div><div><button data-edit-category="${escapeAttribute(root.id)}">编辑</button><button data-remove-category="${escapeAttribute(root.id)}">×</button></div></div><div class="settings-category-children">${children.map((item) => `<span><b>${escapeHtml(item.name)}</b><button data-edit-category="${escapeAttribute(item.id)}">编辑</button><button data-remove-category="${escapeAttribute(item.id)}">×</button></span>`).join("") || `<small>暂无二级分类</small>`}</div></section>`;
+    return `<details class="settings-category-group"><summary class="settings-category-root"><div><strong>${escapeHtml(root.name)}</strong><small>${direction}</small></div><div><span class="settings-category-toggle" aria-hidden="true"></span><button data-edit-category="${escapeAttribute(root.id)}" aria-label="编辑${escapeAttribute(root.name)}">☰</button><button data-remove-category="${escapeAttribute(root.id)}" aria-label="停用${escapeAttribute(root.name)}">×</button></div></summary><div class="settings-category-children">${children.map((item) => `<span><b>${escapeHtml(item.name)}</b><button data-edit-category="${escapeAttribute(item.id)}" aria-label="编辑${escapeAttribute(item.name)}">☰</button><button data-remove-category="${escapeAttribute(item.id)}" aria-label="停用${escapeAttribute(item.name)}">×</button></span>`).join("") || `<small>暂无二级分类</small>`}</div></details>`;
   }
   function settingsAccountOptionRow(account) {
     const displayName = account.ownerMemberId === "family" && account.id === "account-family" ? "银行卡" : cleanAccountDisplayName(account);
-    return `<div class="settings-account-row"><div><span>${escapeHtml(memberName(account.ownerMemberId))}</span><strong>${escapeHtml(displayName)}</strong><small>${escapeHtml(accountTypeName(account.type))} · ${money(account.currentBalanceCents)}</small></div><div><button class="finance-secondary" data-edit-account="${escapeAttribute(account.id)}">编辑</button><button class="finance-secondary is-danger" data-archive-account="${escapeAttribute(account.id)}">停用</button></div></div>`;
+    return `<div class="settings-account-row"><div><span>${escapeHtml(memberName(account.ownerMemberId))}</span><strong>${escapeHtml(displayName)}</strong><small>${escapeHtml(accountTypeName(account.type))} · ${money(account.currentBalanceCents)}</small></div><div><button class="finance-secondary settings-icon-button" data-edit-account="${escapeAttribute(account.id)}" aria-label="编辑${escapeAttribute(displayName)}">☰</button><button class="finance-secondary is-danger" data-archive-account="${escapeAttribute(account.id)}">×</button></div></div>`;
+  }
+  function incomeDestinationChoices() {
+    const retirementGoal = state.goals.find((item) => item.kind === "GOOSE" && item.status !== "CLOSED");
+    const fixed = [
+      ["LIVING|", "个人生活账户"],
+      ["FAMILY|account-family", "家庭公共账户"],
+      ["DREAM_SHORT|dream-fund-short", "短期 Dream 账户"],
+      ["DREAM_LONG|dream-fund-long", "长期 Dream 账户"],
+      [`RETIREMENT|${retirementGoal?.id || ""}`, "退休账户"]
+    ];
+    const accounts = state.accounts.filter((item) => !item.isArchived && !["VIRTUAL_POOL"].includes(item.type)).map((item) => [`ACCOUNT|${item.id}`, `其他账户 · ${accountName(item.id)}`]);
+    return [...fixed, ...accounts];
+  }
+  function incomeDestinationOptions(selected) { return incomeDestinationChoices().map(([value, label]) => `<option value="${escapeAttribute(value)}" ${value === selected ? "selected" : ""}>${escapeHtml(label)}</option>`).join(""); }
+  function incomeDestinationLabel(allocation) {
+    if (allocation.destinationType === "LIVING") return "个人生活";
+    if (allocation.destinationType === "FAMILY") return "家庭公共";
+    if (allocation.destinationType === "DREAM_SHORT") return "短期 Dream";
+    if (allocation.destinationType === "DREAM_LONG") return "长期 Dream";
+    if (allocation.destinationType === "RETIREMENT") return "退休账户";
+    return accountName(allocation.targetId);
+  }
+  function formatBps(value) { return `${(Number(value || 0) / 100).toFixed(2).replace(/\.00$/, "")}%`; }
+  function incomeRuleSettingsRow(rule) {
+    const category = categoryById(rule.categoryId);
+    return `<details class="income-rule-row"><summary><div><strong>${escapeHtml(category?.name || rule.name || "收入")}</strong><small>${rule.allocations.map((item) => `${incomeDestinationLabel(item)} ${formatBps(item.bps)}`).join(" · ")}</small></div><div><span class="settings-category-toggle" aria-hidden="true"></span><button data-edit-income-rule="${escapeAttribute(rule.id)}" aria-label="编辑规则">☰</button><button data-remove-income-rule="${escapeAttribute(rule.id)}" aria-label="停用规则">×</button></div></summary><div class="income-rule-breakdown">${rule.allocations.map((item) => `<span><b>${escapeHtml(incomeDestinationLabel(item))}</b>${formatBps(item.bps)}</span>`).join("")}</div></details>`;
   }
   function allocationRuleView(rule = {}) { const values = [["固定", rule.fixedBps], ["生活", rule.livingBps], ["机动", rule.flexBps], ["Dream", rule.dreamBps], ["投资", rule.investmentBps]]; return `<div class="allocation-rule">${values.map(([label, bps]) => `<div><span>${label}</span><strong>${((Number(bps) || 0) / 100).toFixed(0)}%</strong></div>`).join("")}</div>`; }
   function dreamFundSettlement(fund) { return Math.round((Number(fund.openingBalanceCents) + Number(fund.annualTransferCents) - Number(fund.annualExpenseCents)) * (1 + Number(fund.annualYieldBps || 0) / 10000)); }
@@ -1287,8 +1505,50 @@
       const allocated = sum(flows.map((flow) => flow.allocated));
       const earnings = sum(flows.map((flow) => flow.earnings));
       const spent = sum(flows.map((flow) => flow.spent));
-      return `<article class="dream-fund-category is-${group.key}"><div class="dream-fund-category-head"><div><strong>${escapeHtml(group.label)}</strong><span>${escapeHtml(group.description)}</span></div><div><b>${money(amount)}</b><small>🥚 ${money(earnings)}</small></div></div><div class="dream-fund-flow-summary"><span>收入分配 <b>${money(allocated)}</b></span><span>利息/收益 <b>${money(earnings)}</b></span><span>累计支出 <b>${money(spent)}</b></span></div><div class="dream-fund-purpose-list">${group.goals.length ? group.goals.map((goal) => `<div class="dream-fund-purpose-item"><button type="button" data-dream-animal="${escapeAttribute(goal.id)}"><span class="dream-fund-purpose-icon">${iconFor(goal)}</span><span><strong>${escapeHtml(goal.name)}</strong><small>${escapeHtml(animalPurpose(goal))}</small></span><span class="dream-fund-purpose-value"><b>${money(goal.currentAmountCents)}</b><small>${formatProgress(goal)}</small></span></button><button type="button" class="dream-fund-purpose-menu" data-dream-animal-menu="${escapeAttribute(goal.id)}" aria-label="管理${escapeAttribute(goal.name)}">⋯</button></div>`).join("") : `<div class="finance-empty">暂无目标，可在花园中添加</div>`}</div></article>`;
+      return `<article class="dream-fund-category is-${group.key}"><div class="dream-fund-category-head"><div><strong>${escapeHtml(group.label)}</strong><span>${escapeHtml(group.description)}</span></div><div><b>${money(amount)}</b><small>🥚 ${money(earnings)}</small></div></div><div class="dream-fund-purpose-list">${group.goals.length ? group.goals.map((goal) => `<div class="dream-fund-purpose-item" id="garden-account-${escapeAttribute(goal.id)}"><button type="button" data-dream-animal-menu="${escapeAttribute(goal.id)}"><span class="dream-fund-purpose-icon">${iconFor(goal)}</span><span><strong>${escapeHtml(goal.name)}</strong><small>${escapeHtml(animalPurpose(goal))}</small></span><span class="dream-fund-purpose-value"><b>${money(goal.currentAmountCents)}</b><small>${formatProgress(goal)}</small></span></button><button type="button" class="dream-fund-purpose-menu" data-dream-animal-menu="${escapeAttribute(goal.id)}" aria-label="管理${escapeAttribute(goal.name)}">⋯</button></div>`).join("") : `<div class="finance-empty">暂无目标，可在花园中添加</div>`}</div></article>`;
     }).join("")}</div></section>`;
+  }
+
+  function gardenAccountDetails(goals, accountAnimals, monthFlows) {
+    const retirement = goals.filter((goal) => goal.kind === "GOOSE");
+    const longGoals = goals.filter((goal) => goal.kind === "DUCK");
+    const shortGoals = goals.filter((goal) => goal.kind === "CHICKEN");
+    const animalById = (id) => accountAnimals.find((item) => item.id === id);
+    const goalRows = (items) => items.length ? items.map((goal) => gardenGoalRow(goal)).join("") : `<div class="finance-empty">暂未添加目标</div>`;
+    return `<div class="garden-account-details">
+      <section class="finance-panel garden-account-group">
+        <div class="garden-account-title"><div><span>退休账户</span><strong>退休鹅</strong></div><small>本金不动，收益以蛋记录</small></div>
+        <div class="garden-detail-list">${goalRows(retirement)}</div>
+      </section>
+      <section class="finance-panel dream-fund-details">
+        <div class="dream-fund-details-head"><div><span>Dream基金</span><strong>${money(sum([...longGoals, ...shortGoals].map((goal) => goal.currentAmountCents)))}</strong></div><small>长期目标在左，短期目标在右</small></div>
+        <div class="dream-fund-category-grid">
+          ${gardenGoalColumn("长期 Dream", "鸭子 · 买房、旅居、开店", longGoals, "long")}
+          ${gardenGoalColumn("短期 Dream", "鸡 · 旅游、设备、学习", shortGoals, "short")}
+        </div>
+      </section>
+      ${gardenAccountAnimalSection("家庭公共账户", [animalById("garden-pigeon")], monthFlows)}
+      ${gardenAccountAnimalSection("个人生活账户", [animalById("garden-magpie"), animalById("garden-pupa")], monthFlows, true)}
+    </div>`;
+  }
+
+  function gardenGoalColumn(title, description, goals, key) {
+    const total = sum(goals.map((goal) => goal.currentAmountCents));
+    const eggs = sum(goals.map((goal) => Math.max(0, Number(goal.earningsCents) || 0)));
+    return `<article class="dream-fund-category is-${key}"><div class="dream-fund-category-head"><div><strong>${escapeHtml(title)}</strong><span>${escapeHtml(description)}</span></div><div><b>${money(total)}</b><small>🥚 ${money(eggs)}</small></div></div><div class="dream-fund-purpose-list">${goals.length ? goals.map(gardenGoalRow).join("") : `<div class="finance-empty">暂未添加目标</div>`}</div></article>`;
+  }
+
+  function gardenGoalRow(goal) {
+    const icon = goal.icon || ({ GOOSE: "🪿", DUCK: "🦆", CHICKEN: "🐔" })[goal.kind] || "🌱";
+    return `<div class="dream-fund-purpose-item" id="garden-account-${escapeAttribute(goal.id)}"><button type="button" data-dream-animal-menu="${escapeAttribute(goal.id)}"><span class="dream-fund-purpose-icon">${icon}</span><span><strong>${escapeHtml(goal.name)}</strong><small>${escapeHtml(animalPurpose(goal))}</small></span><span class="dream-fund-purpose-value"><b>${money(goal.currentAmountCents)}</b><small>${formatProgress(goal)}</small></span></button><button type="button" class="dream-fund-purpose-menu" data-dream-animal-menu="${escapeAttribute(goal.id)}" aria-label="管理${escapeAttribute(goal.name)}">⋯</button></div>`;
+  }
+
+  function gardenAccountAnimalSection(title, animals, monthFlows, split = false) {
+    const rows = animals.filter(Boolean).map((animal) => {
+      const flow = monthFlows[animal.eggSourceId] || { incoming: 0, outgoing: 0 };
+      return `<article class="garden-linked-account" id="garden-account-${escapeAttribute(animal.id)}"><button type="button" data-dream-animal-menu="${escapeAttribute(animal.id)}"><span class="garden-linked-icon">${animal.icon}</span><span><small>${escapeHtml(animal.description)}</small><strong>${escapeHtml(animal.name)}</strong></span><span><small>本月流入 / 流出</small><b>${money(flow.incoming)} / ${money(flow.outgoing)}</b></span><em>${money(animal.currentAmountCents)}</em></button><button type="button" class="dream-fund-purpose-menu" data-dream-animal-menu="${escapeAttribute(animal.id)}" aria-label="管理${escapeAttribute(animal.name)}">⋯</button></article>`;
+    }).join("");
+    return `<section class="finance-panel garden-account-group"><div class="garden-account-title"><strong>${escapeHtml(title)}</strong></div><div class="garden-linked-grid ${split ? "is-split" : ""}">${rows || `<div class="finance-empty">暂无账户</div>`}</div></section>`;
   }
   function goalFundFlow(goal) {
     const entries = state.goalEntries.filter((item) => item.goalId === goal.id);
@@ -1437,9 +1697,10 @@
   function familyAssetTotals(investments = investmentSummaries()) {
     const me = state.members.find((item) => item.isCurrentUser)?.id;
     const otherPrivate = (state.memberAssetSummaries || []).filter((item) => item.memberId !== me);
-    const dailyAssets = sum(state.accounts.filter((item) => item.includeInFamilyAssets && !item.isArchived && item.type !== "CREDIT_CARD" && item.type !== "SECURITIES" && !item.externalInvestmentAccountId).map((item) => item.currentBalanceCents)) + sum(otherPrivate.map((item) => item.assetCents));
+    const privateFundCash = sum(state.accounts.filter((item) => item.includeInFamilyAssets && !item.isArchived && item.purpose === "PRIVATE_FUND" && item.type !== "CREDIT_CARD" && !item.externalInvestmentAccountId).map((item) => item.currentBalanceCents));
+    const dailyAssets = sum(state.accounts.filter((item) => item.includeInFamilyAssets && !item.isArchived && item.purpose !== "PRIVATE_FUND" && item.type !== "CREDIT_CARD" && item.type !== "SECURITIES" && !item.externalInvestmentAccountId).map((item) => item.currentBalanceCents)) + sum(otherPrivate.map((item) => item.assetCents));
     const liabilities = Math.abs(sum(state.accounts.filter((item) => !item.isArchived && item.type === "CREDIT_CARD" && item.currentBalanceCents < 0).map((item) => item.currentBalanceCents))) + sum(otherPrivate.map((item) => item.liabilityCents));
-    const investmentAssets = sum(investments.map((item) => item.totalAssetCents));
+    const investmentAssets = sum(investments.map((item) => item.totalAssetCents)) + privateFundCash;
     return { dailyAssets, liabilities, investmentAssets, totalAssets: dailyAssets + investmentAssets, netAssets: dailyAssets + investmentAssets - liabilities };
   }
 
@@ -1640,6 +1901,7 @@
       dreamFunds: Array.isArray(raw.dreamFunds) && raw.dreamFunds.length ? raw.dreamFunds : fallback.dreamFunds,
       tags: Array.isArray(raw.tags) ? raw.tags : fallback.tags,
       allocationRules: Array.isArray(raw.allocationRules) && raw.allocationRules.length ? raw.allocationRules : fallback.allocationRules,
+      incomeAllocationRules: Array.isArray(raw.incomeAllocationRules) && raw.incomeAllocationRules.length ? raw.incomeAllocationRules : fallback.incomeAllocationRules,
       memberAssetSummaries: Array.isArray(raw.memberAssetSummaries) ? raw.memberAssetSummaries : [],
       memberMonthlySummaries: Array.isArray(raw.memberMonthlySummaries) ? raw.memberMonthlySummaries : []
     };
@@ -1648,7 +1910,7 @@
   function v2AccountSeeds(members) {
     const partner = members.find((item) => item.id !== "member-me" && item.isActive && (item.role === "伴侣" || item.role === "对象" || item.displayName.includes("胖胖"))) || members.find((item) => item.id !== "member-me" && item.isActive);
     const rows = [
-      accountSeed("account-bank", "银行卡", "BANK", "member-me", 0, true), accountSeed("account-wechat", "微信", "WECHAT", "member-me", 0, true), accountSeed("account-alipay", "支付宝", "ALIPAY", "member-me", 0, true), accountSeed("account-credit", "信用卡", "CREDIT_CARD", "member-me", 0, true),
+      accountSeed("account-bank", "银行卡", "BANK", "member-me", 0, true, "PRIVATE_FUND"), accountSeed("account-wechat", "微信", "WECHAT", "member-me", 0, true), accountSeed("account-alipay", "支付宝", "ALIPAY", "member-me", 0, true), accountSeed("account-credit", "信用卡", "CREDIT_CARD", "member-me", 0, true),
       accountSeed("account-securities-self", "本人证券账户", "SECURITIES", "member-me", 0, false), accountSeed("account-dream-virtual", "Dream虚拟资金池", "VIRTUAL_POOL", "member-me", 0, false),
       accountSeed("account-family", "家庭公共银行卡", "FAMILY_SHARED", "family", 0, true), accountSeed("account-family-reserve", "家庭备用金", "CASH", "family", 0, true), accountSeed("account-family-securities", "家庭证券账户", "SECURITIES", "family", 0, false), accountSeed("account-family-dream", "家庭Dream基金", "VIRTUAL_POOL", "family", 0, false)
     ];
