@@ -497,19 +497,11 @@
     const open = event.target.closest("[data-open-view]");
     if (open) { openFinanceView(open.dataset.openView); return; }
     const animalMenu = event.target.closest("[data-dream-animal-menu]");
-    if (animalMenu) { openDreamAnimalMenu(animalMenu.dataset.dreamAnimalMenu); return; }
+    if (animalMenu) { openDreamAnimalDetail(animalMenu.dataset.dreamAnimalMenu); return; }
     const dreamAnimal = event.target.closest("[data-dream-animal]");
     if (dreamAnimal) {
       if (Date.now() < suppressDreamAnimalClickUntil) { event.preventDefault(); return; }
-      const target = document.getElementById(`garden-account-${dreamAnimal.dataset.dreamAnimal}`);
-      if (target) {
-        target.scrollIntoView({ behavior: "smooth", block: "center" });
-        target.classList.remove("is-garden-focus");
-        window.requestAnimationFrame(() => target.classList.add("is-garden-focus"));
-        window.setTimeout(() => target.classList.remove("is-garden-focus"), 1400);
-      } else {
-        openDreamAnimalDetail(dreamAnimal.dataset.dreamAnimal);
-      }
+      openDreamAnimalDetail(dreamAnimal.dataset.dreamAnimal);
       return;
     }
     if (event.target.closest("[data-add-income]")) { openTransactionModal({ type: "INCOME", categoryId: "income-salary" }); return; }
@@ -598,7 +590,7 @@
     const animal = event.target.closest("[data-dream-animal]");
     if (!animal) return;
     event.preventDefault();
-    openDreamAnimalMenu(animal.dataset.dreamAnimal);
+    openDreamAnimalDetail(animal.dataset.dreamAnimal);
   }
 
   function handleDreamAnimalPointerDown(event) {
@@ -607,7 +599,7 @@
     cancelDreamAnimalLongPress();
     dreamLongPressTimer = window.setTimeout(() => {
       suppressDreamAnimalClickUntil = Date.now() + 900;
-      openDreamAnimalMenu(animal.dataset.dreamAnimal);
+      openDreamAnimalDetail(animal.dataset.dreamAnimal);
     }, 650);
   }
 
@@ -1353,7 +1345,16 @@
       const accounts = accountsFor(ownerId);
       const currentAmountCents = ownerId === "family" ? accountGroupTotal(accounts) : livingAccountBalanceFor(ownerId);
       const budget = Number(rule.livingBudgets?.[ownerId]) || 0;
-      return { id, kind, icon, name, description, isAccountAnimal: true, currentAmountCents, targetAmountCents: budget || Math.max(currentAmountCents, 1), earningsCents: accountInterest(accounts), eggSourceId: accounts[0]?.id || "" };
+      const source = ownerId === "family" ? accounts[0] : accounts.find((item) => item.purpose === "LIVING");
+      return {
+        id, kind, icon, name, description, ownerMemberId: ownerId, isAccountAnimal: true,
+        currentAmountCents, targetAmountCents: budget || Math.max(currentAmountCents, 1),
+        earningsCents: accountInterest(accounts), eggSourceId: source?.id || "",
+        linkedAccountIds: accounts.map((item) => item.id),
+        fundingSources: ownerId === "family"
+          ? [{ label: "家庭公共账户余额", amountCents: currentAmountCents }]
+          : [{ label: "收入划入个人生活费 − 已记生活支出", amountCents: currentAmountCents }]
+      };
     };
     return [make("garden-pigeon", "PIGEON", "🕊️", "家庭鸽子", "家庭公共消费账户", "family"), make("garden-magpie", "MAGPIE", "🐦", "白白喜鹊", "白白生活支出账户", white?.id || ""), make("garden-pupa", "PUPA", "🐛", "胖胖蚕蛹", "胖胖生活支出账户", pang?.id || "")];
   }
@@ -1388,6 +1389,54 @@
     const pang = state.members.find((item) => item.id !== white?.id && item.isActive && item.displayName.includes("胖胖")) || state.members.find((item) => item.id !== white?.id && item.isActive);
     return [...effectiveGoals(investmentSummaries()), ...accountGardenAnimals(white, pang)];
   }
+  function animalFundingSources(animal) {
+    if (Array.isArray(animal.fundingSources) && animal.fundingSources.length) return animal.fundingSources;
+    if (animal.kind === "DUCK" || animal.kind === "CHICKEN") {
+      const fundType = animal.kind === "DUCK" ? "LONG" : "SHORT";
+      const fund = state.dreamFunds.find((item) => item.type === fundType);
+      return [
+        { label: `${fundType === "LONG" ? "长期" : "短期"}Dream虚拟资金池`, amountCents: animal.currentAmountCents },
+        { label: `真实存放：${accountName(fund?.storageAccountId)}`, amountCents: null }
+      ];
+    }
+    const linked = (animal.linkedAccountIds || []).map(accountById).filter(Boolean);
+    if (linked.length) return linked.map((account) => ({ label: cleanAccountDisplayName(account), amountCents: account.currentBalanceCents }));
+    if (animal.linkedInvestmentAccountIds?.length) return [{ label: "股票交易投资资产", amountCents: sum(investmentSummaries().map((item) => item.totalAssetCents)) }];
+    return [];
+  }
+  function animalHistory(animal) {
+    const typeName = (type) => ({ SPEND: "支出", EARNING: "利息/收益", ALLOCATION: "存入" })[type] || "资金变化";
+    if (!animal.isAccountAnimal) {
+      return state.goalEntries.filter((item) => item.goalId === animal.id).map((item) => {
+        const transaction = state.transactions.find((row) => row.id === item.transactionId);
+        return { occurredAt: item.occurredAt, label: typeName(item.type), note: transaction?.note || "", amountCents: item.amountCents };
+      }).sort((a, b) => String(b.occurredAt).localeCompare(String(a.occurredAt)));
+    }
+    const accountIds = new Set(animal.linkedAccountIds || []);
+    const ownerId = animal.ownerMemberId;
+    return state.transactions.filter((item) => {
+      const transactionOwner = item.ownerMemberId || item.payerMemberId || item.bookkeeperMemberId || "family";
+      return accountIds.has(item.fromAccountId) || accountIds.has(item.toAccountId) || transactionOwner === ownerId;
+    }).map((item) => ({
+      occurredAt: item.occurredAt,
+      label: typeName(item.type),
+      note: item.note || categoryName(item.categoryId),
+      amountCents: item.type === "EXPENSE" || (item.type === "TRANSFER" && accountIds.has(item.fromAccountId)) ? -item.amountCents : item.amountCents
+    })).sort((a, b) => String(b.occurredAt).localeCompare(String(a.occurredAt)));
+  }
+  function animalSourceAccountId(animal) {
+    if (animal.eggSourceId) return animal.eggSourceId;
+    if (animal.kind === "DUCK" || animal.kind === "CHICKEN") {
+      const fund = state.dreamFunds.find((item) => item.type === (animal.kind === "DUCK" ? "LONG" : "SHORT"));
+      return fund?.storageAccountId || "";
+    }
+    if (animal.kind === "GOOSE") {
+      const account = state.accounts.find((item) => !item.isArchived && item.ownerMemberId === animal.ownerMemberId && item.purpose === "PRIVATE_FUND") ||
+        state.accounts.find((item) => !item.isArchived && item.ownerMemberId === animal.ownerMemberId && item.type !== "CREDIT_CARD");
+      return account?.id || "";
+    }
+    return animal.linkedAccountIds?.[0] || "";
+  }
   function openDreamAnimalDetail(animalId) {
     const animal = allDreamGardenAnimals().find((item) => item.id === animalId);
     if (!animal) return;
@@ -1395,18 +1444,22 @@
     const icon = animal.icon || (animal.kind === "GOOSE" ? "🪿" : animal.kind === "DUCK" ? "🦆" : "🐔");
     const purpose = animalPurpose(animal);
     const eggAmount = Math.max(0, Number(animal.earningsCents) || 0);
-    const sourceAccountId = animal.eggSourceId || animal.linkedAccountIds?.[0] || (animal.linkedInvestmentAccountIds?.length ? "account-securities-self" : "");
+    const sourceAccountId = animalSourceAccountId(animal);
     const canSpend = !animal.isAccountAnimal && ["DUCK", "CHICKEN"].includes(animal.kind);
     const canDelete = !animal.isAccountAnimal;
-    const modal = createModal(animal.name, `<div class="dream-detail-content"><div class="dream-detail-hero"><div class="dream-animal-visual" style="--fill:${ratio}%"><span class="dream-animal-base">${icon}</span><span class="dream-animal-fill">${icon}</span></div><div><span>${escapeHtml(purpose)}</span><strong>${ratio.toFixed(1)}%</strong></div></div><dl class="dream-detail-stats"><div><dt>当前金额</dt><dd>${money(animal.currentAmountCents)}</dd></div><div><dt>目标金额</dt><dd>${money(animal.targetAmountCents)}</dd></div><div><dt>完成度</dt><dd>${ratio.toFixed(1)}%</dd></div><div><dt>蛋金额</dt><dd>🥚 ${money(eggAmount)}</dd></div></dl><button class="dream-detail-egg" data-dream-detail-egg>🥚 利息/收益：${money(eggAmount)}</button><div class="dream-detail-actions"><button class="finance-primary" data-dream-detail-deposit>存入</button>${canSpend ? `<button class="finance-secondary" data-dream-detail-spend>支出</button><button class="finance-secondary" data-dream-detail-interest>记利息</button>` : ""}<button class="finance-secondary" data-dream-detail-record>记录</button><button class="finance-secondary" data-dream-detail-edit>编辑</button>${canDelete ? `<button class="finance-secondary is-danger" data-dream-detail-delete>删除</button>` : ""}</div></div>`);
+    const sources = animalFundingSources(animal);
+    const history = animalHistory(animal).slice(0, 8);
+    const sourceRows = sources.length ? sources.map((item) => `<div class="dream-detail-source ${item.isDeduction ? "is-deduction" : ""}"><span>${escapeHtml(item.label)}</span>${item.amountCents == null ? "" : `<strong>${signedMoney(item.amountCents)}</strong>`}</div>`).join("") : `<div class="dream-detail-empty">尚未关联资金来源</div>`;
+    const historyRows = history.length ? history.map((item) => `<div class="dream-detail-history-row"><span>${escapeHtml(formatDateTime(item.occurredAt))}<small>${escapeHtml(item.label)}${item.note ? ` · ${item.note}` : ""}</small></span><strong class="${item.amountCents < 0 ? "finance-expense" : "finance-transfer"}">${signedMoney(item.amountCents)}</strong></div>`).join("") : `<div class="dream-detail-empty">还没有存入或资金变化记录</div>`;
+    const modal = createModal(animal.name, `<div class="dream-detail-content"><div class="dream-detail-hero"><div class="dream-animal-visual" style="--fill:${ratio}%"><span class="dream-animal-base">${icon}</span><span class="dream-animal-fill">${icon}</span></div><div><span>${escapeHtml(purpose)}</span><strong>${ratio.toFixed(1)}%</strong></div></div><dl class="dream-detail-stats"><div><dt>当前金额</dt><dd>${money(animal.currentAmountCents)}</dd></div><div><dt>目标金额</dt><dd>${money(animal.targetAmountCents)}</dd></div><div><dt>完成度</dt><dd>${ratio.toFixed(1)}%</dd></div><div><dt>🥚 累计收益</dt><dd>${money(eggAmount)}</dd></div></dl><section class="dream-detail-section"><h4>关联资金来源</h4><div class="dream-detail-source-list">${sourceRows}</div></section><section class="dream-detail-section"><h4>存入与历史记录</h4><div class="dream-detail-history">${historyRows}</div></section><div class="dream-detail-actions"><button class="finance-primary" data-dream-detail-deposit>存入</button><button class="finance-secondary" data-dream-detail-record>记录</button><button class="finance-secondary" data-dream-detail-edit>编辑</button>${canSpend ? `<button class="finance-secondary" data-dream-detail-spend>支出</button><button class="finance-secondary" data-dream-detail-interest>记利息</button>` : ""}${canDelete ? `<button class="finance-secondary is-danger" data-dream-detail-delete>删除</button>` : ""}</div></div>`);
     modal.classList.add("is-dream-detail");
-    modal.querySelector(".finance-modal")?.classList.add("dream-detail-sheet");
+    modal.querySelector(".finance-modal")?.classList.add("dream-detail-sheet", "dream-animal-detail-page");
     modal.addEventListener("click", (event) => {
       if (event.target.closest("[data-dream-detail-deposit]")) {
         closeModal(modal);
         if (animal.isAccountAnimal) openTransactionModal({ type: "INCOME", toAccountId: sourceAccountId, note: `存入${animal.name}` });
-        else if (!animal.linkedAccountIds?.length) window.alert("请先编辑目标并关联至少一个真实账户。");
-        else openTransactionModal({ type: "TRANSFER", goalId: animal.id, toAccountId: animal.linkedAccountIds[0] });
+        else if (!sourceAccountId) window.alert("请先点“编辑”，为这个动物关联真实资金账户。");
+        else openTransactionModal({ type: "TRANSFER", goalId: animal.id, toAccountId: sourceAccountId });
       } else if (event.target.closest("[data-dream-detail-spend]")) {
         closeModal(modal);
         openTransactionModal({ type: "EXPENSE", goalId: animal.id, fromAccountId: sourceAccountId, categoryId: animal.kind === "DUCK" ? "dream-long" : "dream-short", note: `${animal.name}支出` });
@@ -1415,30 +1468,19 @@
         openTransactionModal({ type: "INCOME", goalId: animal.id, toAccountId: sourceAccountId, categoryId: animal.kind === "DUCK" ? "dream-long" : "dream-short", note: `${animal.name}利息收益` });
       } else if (event.target.closest("[data-dream-detail-record]")) {
         closeModal(modal);
-        if (animal.isAccountAnimal) openAccountDetail(sourceAccountId); else openGoalHistory(animal.id);
+        if (animal.isAccountAnimal && sourceAccountId) openAccountDetail(sourceAccountId); else if (animal.isAccountAnimal) openTransactionModal({ ownerMemberId: animal.ownerMemberId }); else openGoalHistory(animal.id);
       } else if (event.target.closest("[data-dream-detail-edit]")) {
         closeModal(modal);
-        if (animal.isAccountAnimal) openAccountModal(sourceAccountId); else openGoalModal(animal.id);
+        if (animal.isAccountAnimal && sourceAccountId) openAccountModal(sourceAccountId); else if (animal.isAccountAnimal) openAllocationRuleModal(); else openGoalModal(animal.id);
       } else if (event.target.closest("[data-dream-detail-delete]")) {
         closeModal(modal);
         archiveDreamGoal(animal.id);
-      } else if (event.target.closest("[data-dream-detail-egg]")) {
-        closeModal(modal);
-        openTransactionModal({ type: "TRANSFER", fromAccountId: sourceAccountId, amountCents: eggAmount, note: `${animal.name}的蛋（利息）再分配` });
       }
     });
   }
 
   function openDreamAnimalMenu(animalId) {
-    const animal = allDreamGardenAnimals().find((item) => item.id === animalId);
-    if (!animal) return;
-    const sourceAccountId = animal.eggSourceId || animal.linkedAccountIds?.[0] || "";
-    const modal = createModal(`管理${animal.name}`, `<div class="dream-animal-menu"><button class="finance-primary" data-animal-menu-edit>编辑动物与目标</button><button class="finance-secondary" data-animal-menu-detail>查看详情</button>${animal.isAccountAnimal ? "" : `<button class="finance-secondary is-danger" data-animal-menu-delete>删除动物</button>`}<small>${animal.isAccountAnimal ? "账户动物与真实账户联动，不可在花园中单独删除。" : "删除后会从花园隐藏，历史资金记录仍会保留。"}</small></div>`);
-    modal.addEventListener("click", (event) => {
-      if (event.target.closest("[data-animal-menu-edit]")) { closeModal(modal); if (animal.isAccountAnimal) openAccountModal(sourceAccountId); else openGoalModal(animal.id); }
-      else if (event.target.closest("[data-animal-menu-detail]")) { closeModal(modal); openDreamAnimalDetail(animal.id); }
-      else if (event.target.closest("[data-animal-menu-delete]")) { closeModal(modal); archiveDreamGoal(animal.id); }
-    });
+    openDreamAnimalDetail(animalId);
   }
 
   function archiveDreamGoal(goalId) {
@@ -1540,13 +1582,13 @@
 
   function gardenGoalRow(goal) {
     const icon = goal.icon || ({ GOOSE: "🪿", DUCK: "🦆", CHICKEN: "🐔" })[goal.kind] || "🌱";
-    return `<div class="dream-fund-purpose-item" id="garden-account-${escapeAttribute(goal.id)}"><button type="button" data-dream-animal-menu="${escapeAttribute(goal.id)}"><span class="dream-fund-purpose-icon">${icon}</span><span><strong>${escapeHtml(goal.name)}</strong><small>${escapeHtml(animalPurpose(goal))}</small></span><span class="dream-fund-purpose-value"><b>${money(goal.currentAmountCents)}</b><small>${formatProgress(goal)}</small></span></button><button type="button" class="dream-fund-purpose-menu" data-dream-animal-menu="${escapeAttribute(goal.id)}" aria-label="管理${escapeAttribute(goal.name)}">⋯</button></div>`;
+    return `<div class="dream-fund-purpose-item" id="garden-account-${escapeAttribute(goal.id)}"><button type="button" data-dream-animal="${escapeAttribute(goal.id)}"><span class="dream-fund-purpose-icon">${icon}</span><span><strong>${escapeHtml(goal.name)}</strong><small>${escapeHtml(animalPurpose(goal))}</small></span><span class="dream-fund-purpose-value"><b>${money(goal.currentAmountCents)}</b><small>${formatProgress(goal)}</small></span></button><button type="button" class="dream-fund-purpose-menu" data-dream-animal="${escapeAttribute(goal.id)}" aria-label="查看${escapeAttribute(goal.name)}详情">›</button></div>`;
   }
 
   function gardenAccountAnimalSection(title, animals, monthFlows, split = false) {
     const rows = animals.filter(Boolean).map((animal) => {
       const flow = monthFlows[animal.eggSourceId] || { incoming: 0, outgoing: 0 };
-      return `<article class="garden-linked-account" id="garden-account-${escapeAttribute(animal.id)}"><button type="button" data-dream-animal-menu="${escapeAttribute(animal.id)}"><span class="garden-linked-icon">${animal.icon}</span><span><small>${escapeHtml(animal.description)}</small><strong>${escapeHtml(animal.name)}</strong></span><span><small>本月流入 / 流出</small><b>${money(flow.incoming)} / ${money(flow.outgoing)}</b></span><em>${money(animal.currentAmountCents)}</em></button><button type="button" class="dream-fund-purpose-menu" data-dream-animal-menu="${escapeAttribute(animal.id)}" aria-label="管理${escapeAttribute(animal.name)}">⋯</button></article>`;
+      return `<article class="garden-linked-account" id="garden-account-${escapeAttribute(animal.id)}"><button type="button" data-dream-animal="${escapeAttribute(animal.id)}"><span class="garden-linked-icon">${animal.icon}</span><span><small>${escapeHtml(animal.description)}</small><strong>${escapeHtml(animal.name)}</strong></span><span><small>本月流入 / 流出</small><b>${money(flow.incoming)} / ${money(flow.outgoing)}</b></span><em>${money(animal.currentAmountCents)}</em></button><button type="button" class="dream-fund-purpose-menu" data-dream-animal="${escapeAttribute(animal.id)}" aria-label="查看${escapeAttribute(animal.name)}详情">›</button></article>`;
     }).join("");
     return `<section class="finance-panel garden-account-group"><div class="garden-account-title"><strong>${escapeHtml(title)}</strong></div><div class="garden-linked-grid ${split ? "is-split" : ""}">${rows || `<div class="finance-empty">暂无账户</div>`}</div></section>`;
   }
@@ -1704,12 +1746,64 @@
     return { dailyAssets, liabilities, investmentAssets, totalAssets: dailyAssets + investmentAssets, netAssets: dailyAssets + investmentAssets - liabilities };
   }
 
+  function retirementFundingModel(investments = investmentSummaries()) {
+    const white = currentMember();
+    const pang = partnerMember();
+    const personalAssets = (memberId) => sum(state.accounts.filter((item) =>
+      !item.isArchived && item.includeInFamilyAssets !== false && item.ownerMemberId === memberId &&
+      !item.isShared && item.id !== "account-family" && !["CREDIT_CARD", "SECURITIES", "VIRTUAL_POOL"].includes(item.type)
+    ).map((item) => item.currentBalanceCents));
+    const investmentAssets = sum(investments.map((item) => item.totalAssetCents));
+    const investmentEarnings = sum(investments.map((item) => item.profitLossCents));
+    const whiteAllAssets = personalAssets(white?.id) + investmentAssets;
+    const whiteLiving = Math.max(0, livingAccountBalanceFor(white?.id));
+    const dreamFunds = sum(state.dreamFunds.filter((item) => ["SHORT", "LONG"].includes(item.type)).map((item) => item.currentBalanceCents));
+    const familyPublic = Math.max(0, Number(accountById("account-family")?.currentBalanceCents) || 0);
+    const familyPigeonDream = sum(state.dreamFunds.filter((item) => item.type === "FAMILY").map((item) => item.currentBalanceCents));
+    const privatePangSummary = sum((state.memberAssetSummaries || []).filter((item) => item.memberId === pang?.id).map((item) => Math.max(0, Number(item.assetCents) || 0)));
+    const pangPersonalAssets = personalAssets(pang?.id) + privatePangSummary;
+    const pangManagedAssets = pangPersonalAssets + familyPublic + familyPigeonDream;
+    return {
+      white: {
+        memberId: white?.id || "", currentAmountCents: Math.max(0, whiteAllAssets - whiteLiving - dreamFunds),
+        earningsCents: investmentEarnings,
+        fundingSources: [
+          { label: "白白全部资产", amountCents: whiteAllAssets },
+          { label: "减：白白个人生活账户", amountCents: -whiteLiving, isDeduction: true },
+          { label: "减：Dream基金", amountCents: -dreamFunds, isDeduction: true }
+        ]
+      },
+      pang: {
+        memberId: pang?.id || "", currentAmountCents: Math.max(0, pangManagedAssets - familyPublic - familyPigeonDream),
+        earningsCents: 0,
+        fundingSources: [
+          { label: "胖胖全部资产（含代管）", amountCents: pangManagedAssets },
+          { label: "减：家庭公共账户", amountCents: -familyPublic, isDeduction: true },
+          { label: "减：家庭鸽子目标资金", amountCents: -familyPigeonDream, isDeduction: true }
+        ]
+      }
+    };
+  }
+
   function effectiveGoals(investments) {
-    const investmentAsset = sum(investments.map((item) => item.totalAssetCents));
-    const investmentPnl = sum(investments.map((item) => item.profitLossCents));
+    const retirement = retirementFundingModel(investments);
+    const geese = state.goals.filter((goal) => !goal.isArchived && goal.kind === "GOOSE");
     return state.goals.filter((goal) => !goal.isArchived).map((goal) => {
-      if (!goal.linkedInvestmentAccountIds?.length) return { ...goal, currentAmountCents: goal.allocatedAmountCents };
-      return { ...goal, currentAmountCents: investmentAsset, principalCents: Math.max(0, investmentAsset - investmentPnl), earningsCents: investmentPnl };
+      if (goal.kind !== "GOOSE") return { ...goal, currentAmountCents: goal.allocatedAmountCents };
+      const gooseIndex = geese.findIndex((item) => item.id === goal.id);
+      const model = gooseIndex === 0 ? retirement.white : retirement.pang;
+      const genericNames = ["大鹅", "小鹅", "退休", "买房", "退休鹅"];
+      const fallbackName = gooseIndex === 0 ? "白白退休鹅" : "胖胖退休鹅";
+      return {
+        ...goal,
+        name: genericNames.includes(String(goal.name || "").trim()) ? fallbackName : goal.name,
+        description: gooseIndex === 0 ? "白白长期目标 · 退休自由资金" : "胖胖长期目标 · 退休自由资金",
+        currentAmountCents: model.currentAmountCents,
+        principalCents: Math.max(0, model.currentAmountCents - model.earningsCents),
+        earningsCents: model.earningsCents,
+        ownerMemberId: model.memberId,
+        fundingSources: model.fundingSources
+      };
     });
   }
 

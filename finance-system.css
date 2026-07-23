@@ -570,6 +570,19 @@ details[open] .settings-category-toggle::before { content: "−"; }
 .dream-detail-stats dt { color: var(--finance-muted); font-size: 11px; }
 .dream-detail-stats dd { margin: 5px 0 0; font-size: 14px; font-weight: 800; }
 .dream-detail-egg { min-height: 42px; border: 1px solid #f1d688; border-radius: 10px; color: #8b6200; background: #fff8d8; font-weight: 700; cursor: pointer; }
+.dream-detail-section { overflow: hidden; border: 1px solid var(--finance-line); border-radius: 12px; background: #fff; }
+.dream-detail-section h4 { margin: 0; padding: 11px 13px; border-bottom: 1px solid var(--finance-line); font-size: 14px; }
+.dream-detail-source,
+.dream-detail-history-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 11px 13px; border-bottom: 1px solid var(--finance-line); }
+.dream-detail-source:last-child,
+.dream-detail-history-row:last-child { border-bottom: 0; }
+.dream-detail-source span { color: var(--finance-muted); font-size: 12px; }
+.dream-detail-source strong,
+.dream-detail-history-row > strong { text-align: right; }
+.dream-detail-source.is-deduction strong { color: var(--finance-expense); }
+.dream-detail-history-row > span { display: grid; gap: 3px; font-size: 12px; }
+.dream-detail-history-row small { overflow: hidden; color: var(--finance-muted); text-overflow: ellipsis; white-space: nowrap; }
+.dream-detail-empty { padding: 15px 13px; color: var(--finance-muted); font-size: 12px; text-align: center; }
 .dream-detail-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; }
 .dream-detail-actions button { min-height: 42px; }
 .dream-animal-menu { display: grid; gap: 9px; padding: 16px; }
@@ -1150,17 +1163,19 @@ details[open] .settings-category-toggle::before { content: "−"; }
   box-shadow: 0 22px 70px rgba(0, 0, 0, .22);
 }
 .finance-modal-backdrop.is-dream-detail { place-items: center; }
-.finance-modal.dream-detail-sheet { width: min(520px, 100%); }
+.finance-modal.dream-detail-sheet { width: min(620px, 100%); }
 
 @media (max-width: 680px) {
-  .finance-modal-backdrop.is-dream-detail { place-items: end center; padding: 0; }
+  .finance-modal-backdrop.is-dream-detail { place-items: stretch; padding: 0; }
   .finance-modal.dream-detail-sheet {
     width: 100%;
     max-width: none;
-    max-height: 86svh;
-    border-radius: 22px 22px 0 0;
+    min-height: 100svh;
+    max-height: 100svh;
+    border-radius: 0;
     padding-bottom: calc(16px + env(safe-area-inset-bottom));
   }
+  .dream-detail-actions { position: sticky; bottom: 0; z-index: 2; padding: 10px 0; background: rgba(255,255,255,.96); }
 }
 
 .finance-modal-head {
