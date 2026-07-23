@@ -155,4 +155,12 @@ assert.deepEqual(
 );
 assert.equal(api.routeForView("overview").path, "#/funds/overview");
 assert.equal(api.routeForView("investments").path, "#/investment/holdings");
+const customized = api.defaultState();
+const customizedIncome = customized.categories.find((item) => item.id === "category-income");
+customizedIncome.name = "我的收入";
+const disabledSalary = customized.categories.find((item) => item.id === "income-salary");
+disabledSalary.isActive = false;
+api.setState(customized);
+assert.equal(api.getState().categories.find((item) => item.id === "category-income").name, "我的收入", "默认分类改名后应保留");
+assert.equal(api.getState().categories.find((item) => item.id === "income-salary").isActive, false, "默认分类停用后应保留");
 console.log("finance system scenarios A/B/C passed");

@@ -332,13 +332,27 @@
 
   function renderSettings() {
     const roots = state.categories.filter((item) => !item.parentId && item.isActive !== false);
+    const editableAccounts = state.accounts.filter((item) => !item.isArchived && !["SECURITIES", "VIRTUAL_POOL"].includes(item.type));
     els.content.innerHTML = `
       <div class="finance-page">
         ${pageHead("资金设置", "管理家庭成员、分类、标签、分配规则与虚拟资金池")}
         <div class="settings-grid">
           <section class="finance-panel settings-card"><div class="finance-panel-head"><div><strong>家庭成员</strong><br><span>身份、资产与公共账本权限</span></div><button class="finance-primary" data-add-member>＋ 新增</button></div><div class="settings-list">${state.members.filter((item) => item.isActive).map(settingsMemberRow).join("")}</div></section>
-          <section class="finance-panel settings-card"><div class="finance-panel-head"><div><strong>分类</strong><br><span>快速记账使用 5 个一级分类</span></div><button class="finance-secondary" data-add-category>＋ 二级分类</button></div><div class="settings-category-grid">${roots.map((root) => `<div><strong>${escapeHtml(root.name)}</strong><span>${state.categories.filter((item) => item.parentId === root.id && item.isActive !== false).map((item) => escapeHtml(item.name)).join(" · ")}</span></div>`).join("")}</div></section>
-          <section class="finance-panel settings-card"><div class="finance-panel-head"><div><strong>标签</strong><br><span>给流水增加灵活标记</span></div><button class="finance-secondary" data-add-tag>＋ 标签</button></div><div class="settings-tags">${state.tags.map((tag) => `<button type="button" data-remove-tag="${escapeAttribute(tag)}">${escapeHtml(tag)} ×</button>`).join("") || empty("还没有标签")}</div></section>
+          <section class="finance-panel settings-card is-wide journal-options-card">
+            <div class="finance-panel-head"><div><strong>记账选项管理</strong><br><span>这里的修改会同步到“记一笔”的分类、账户和标签</span></div></div>
+            <div class="journal-option-section">
+              <div class="journal-option-title"><div><strong>一级分类 / 二级分类</strong><span>收入与支出可分别设置</span></div><div><button class="finance-secondary" data-add-primary-category>＋ 一级</button><button class="finance-secondary" data-add-category>＋ 二级</button></div></div>
+              <div class="settings-category-editor">${roots.map(settingsCategoryGroup).join("") || empty("还没有分类")}</div>
+            </div>
+            <div class="journal-option-section">
+              <div class="journal-option-title"><div><strong>标签</strong><span>用于给流水增加灵活标记</span></div><button class="finance-secondary" data-add-tag>＋ 标签</button></div>
+              <div class="settings-tags">${state.tags.map((tag) => `<span class="settings-tag"><b>${escapeHtml(tag)}</b><button type="button" data-edit-tag="${escapeAttribute(tag)}" aria-label="编辑${escapeAttribute(tag)}">编辑</button><button type="button" data-remove-tag="${escapeAttribute(tag)}" aria-label="删除${escapeAttribute(tag)}">×</button></span>`).join("") || empty("还没有标签")}</div>
+            </div>
+            <div class="journal-option-section">
+              <div class="journal-option-title"><div><strong>收付款账户</strong><span>决定“支付 / 转出账户”和“收入 / 转入账户”的选项</span></div><button class="finance-secondary" data-add-account="${escapeAttribute(currentMember()?.id || "")}">＋ 账户</button></div>
+              <div class="settings-account-list">${editableAccounts.map(settingsAccountOptionRow).join("") || empty("还没有可用账户")}</div>
+            </div>
+          </section>
           <section class="finance-panel settings-card"><div class="finance-panel-head"><div><strong>收入分配规则</strong><br><span>固定、生活、机动、Dream 与投资</span></div><button class="finance-secondary" data-edit-allocation-rule>编辑</button></div>${allocationRuleView(state.allocationRules[0])}</section>
           <section class="finance-panel settings-card is-wide"><div class="finance-panel-head"><div><strong>Dream基金目标</strong><br><span>虚拟资金池，真实资金仍放在现有账户</span></div></div><div class="dream-fund-grid">${state.dreamFunds.map(dreamFundCard).join("")}</div></section>
           <section class="finance-panel settings-card"><div class="finance-panel-head"><div><strong>导入导出</strong><br><span>账本 CSV 备份与恢复</span></div></div><div class="finance-inline-actions"><button class="finance-secondary" data-export-csv>导出账本</button><button class="finance-secondary" data-import-csv>导入账本</button><input type="file" accept=".csv,text/csv" data-csv-file hidden></div></section>
@@ -409,7 +423,7 @@
         ${pageHead("Dream花园", "", `<button class="overview-ledger-entry" data-open-view="ledger">账本</button><button class="overview-ledger-entry" data-open-view="accounts">账户</button><button class="finance-primary" data-add-goal>＋ 目标</button>`)}
         ${dreamGarden(goals, accountGardenAnimals(white, pang), false)}
         ${dreamFundDetails()}
-        <div class="member-account-sections dream-family-accounts">${memberAccountSection(familyMember, familyAccounts, month, true, false)}</div>
+        <div class="member-account-sections dream-family-accounts">${memberAccountSection(familyMember, familyAccounts, month, true, false, true)}</div>
       </div>`;
   }
 
@@ -488,8 +502,10 @@
     const deleteMember = event.target.closest("[data-delete-member]");
     if (deleteMember) { void removeMember(deleteMember.dataset.deleteMember); return; }
     if (event.target.closest("[data-add-tag]")) { openTagModal(); return; }
+    const editTag = event.target.closest("[data-edit-tag]");
+    if (editTag) { openTagModal(editTag.dataset.editTag); return; }
     const removeTag = event.target.closest("[data-remove-tag]");
-    if (removeTag) { state.tags = state.tags.filter((item) => item !== removeTag.dataset.removeTag); saveNow(); renderSettings(); return; }
+    if (removeTag) { removeTagOption(removeTag.dataset.removeTag); return; }
     if (event.target.closest("[data-edit-allocation-rule]")) { openAllocationRuleModal(); return; }
     const editDreamFund = event.target.closest("[data-edit-dream-fund]");
     if (editDreamFund) { openDreamFundModal(editDreamFund.dataset.editDreamFund); return; }
@@ -506,11 +522,18 @@
     const addAccount = event.target.closest("[data-add-account]");
     if (addAccount) { openAccountModal("", addAccount.dataset.addAccount || currentMember()?.id || ""); return; }
     if (event.target.closest("[data-open-investment-account]")) { openInvestmentTab("holdings"); return; }
-    if (event.target.closest("[data-add-category]")) { openCategoryModal(); return; }
+    if (event.target.closest("[data-add-primary-category]")) { openCategoryModal("", ""); return; }
+    if (event.target.closest("[data-add-category]")) { openCategoryModal("", state.categories.find((item) => !item.parentId && item.isActive !== false)?.id || ""); return; }
+    const editCategory = event.target.closest("[data-edit-category]");
+    if (editCategory) { openCategoryModal(editCategory.dataset.editCategory); return; }
+    const removeCategory = event.target.closest("[data-remove-category]");
+    if (removeCategory) { removeCategoryOption(removeCategory.dataset.removeCategory); return; }
     const editAccount = event.target.closest("[data-edit-account]");
     if (editAccount) { openAccountModal(editAccount.dataset.editAccount); return; }
     const adjustAccount = event.target.closest("[data-adjust-account]");
     if (adjustAccount) { openBalanceAdjustmentModal(adjustAccount.dataset.adjustAccount); return; }
+    const archiveAccount = event.target.closest("[data-archive-account]");
+    if (archiveAccount) { archiveAccountOption(archiveAccount.dataset.archiveAccount); return; }
     if (event.target.closest("[data-add-goal]")) { openGoalModal(); return; }
     const editGoal = event.target.closest("[data-edit-goal]");
     if (editGoal) { openGoalModal(editGoal.dataset.editGoal); return; }
@@ -807,13 +830,15 @@
     const existing = accountById(accountId);
     const ownerId = existing?.ownerMemberId || requestedOwnerId || currentMember()?.id || "";
     const owner = state.members.find((item) => item.id === ownerId) || currentMember();
+    const ownerLabel = ownerId === "family" ? "家庭成员" : owner?.displayName || "本人";
     const typeChoices = [["BANK","银行卡"],["WECHAT","微信"],["ALIPAY","支付宝"],["CASH","现金"],["CREDIT_CARD","信用卡"],["FAMILY_SHARED","家庭公共账户"],["FUND","基金账户"],["OTHER","其他账户"]];
+    const ownerChoices = [...state.members.filter((item) => item.isActive).map((item) => [item.id, item.displayName]), ["family", "家庭公共"]];
     const modal = createModal(existing ? "编辑账户" : "添加账户", `<form class="finance-form">
       <label class="is-wide"><span>账户名称（选填）</span><input name="name" value="${escapeAttribute(existing ? cleanAccountDisplayName(existing) : "")}" placeholder="留空时自动显示账户类型，例如“银行卡”"></label>
       <label><span>账户类型</span><select name="type">${optionList(typeChoices, existing?.type || "BANK")}</select></label>
-      <input type="hidden" name="ownerMemberId" value="${escapeAttribute(ownerId)}"><label><span>这个账户属于谁</span><input value="${escapeAttribute(owner?.displayName || "当前成员")}" disabled></label>
+      <label><span>这个账户属于谁</span><select name="ownerMemberId">${optionList(ownerChoices, ownerId)}</select></label>
       ${existing ? "" : `<label><span>初始余额（元）</span><input name="balance" type="number" step="0.01" value="0" required></label>`}
-      <label><span>谁可以查看</span><select name="isShared"><option value="false" ${!existing?.isShared ? "selected" : ""}>仅${escapeHtml(owner?.displayName || "本人")}查看</option><option value="true" ${existing?.isShared ? "selected" : ""}>家庭成员都能查看</option></select><small class="finance-field-help">只影响家人能否看到明细。</small></label>
+      <label><span>谁可以查看</span><select name="isShared"><option value="false" ${!existing?.isShared ? "selected" : ""}>仅${escapeHtml(ownerLabel)}查看</option><option value="true" ${existing?.isShared ? "selected" : ""}>家庭成员都能查看</option></select><small class="finance-field-help">只影响家人能否看到明细。</small></label>
       <label><span>首页总资产是否包含它</span><select name="include"><option value="true" ${existing?.includeInFamilyAssets !== false ? "selected" : ""}>包含在家庭总资产中</option><option value="false" ${existing?.includeInFamilyAssets === false ? "selected" : ""}>不加入总资产统计</option></select><small class="finance-field-help">一般银行卡、微信、现金选择“包含”。</small></label>
       <p class="finance-field-note is-wide">证券账户无需在这里重复添加，白白的个人基金和私募基金会自动引用“股票交易”里的最新数据。</p>
       ${existing ? `<label><span>状态</span><select name="isArchived"><option value="false">正常使用</option><option value="true" ${existing.isArchived ? "selected" : ""}>停用归档</option></select></label>` : ""}
@@ -853,17 +878,37 @@
     });
   }
 
-  function openCategoryModal() {
-    const modal = createModal("添加二级分类", `<form class="finance-form">
-      <label class="is-wide"><span>所属一级分类</span><select name="parentId">${state.categories.filter((item) => !item.parentId && item.isActive !== false).map((item) => `<option value="${escapeAttribute(item.id)}">${escapeHtml(item.name)}</option>`).join("")}</select></label>
-      <label class="is-wide"><span>分类名称</span><input name="name" required placeholder="输入自定义分类"></label>
+  function openCategoryModal(categoryId = "", defaultParentId = "") {
+    const existing = categoryById(categoryId);
+    const parentId = existing?.parentId ?? defaultParentId;
+    const roots = state.categories.filter((item) => !item.parentId && item.isActive !== false && item.id !== existing?.id);
+    const modal = createModal(existing ? "编辑分类" : "新增分类", `<form class="finance-form">
+      <label class="is-wide"><span>分类名称</span><input name="name" value="${escapeAttribute(existing?.name || "")}" required placeholder="输入分类名称"></label>
+      <label><span>分类层级</span><select name="parentId"><option value="" ${!parentId ? "selected" : ""}>一级分类</option>${roots.map((item) => `<option value="${escapeAttribute(item.id)}" ${item.id === parentId ? "selected" : ""}>二级 · ${escapeHtml(item.name)}</option>`).join("")}</select></label>
+      <label><span>适用类型</span><select name="direction">${optionList([["INCOME","收入"],["EXPENSE","支出"],["BOTH","收支 / 转账"]], existing?.direction || "EXPENSE")}</select><small class="finance-field-help">二级分类会自动跟随所属一级分类。</small></label>
       <div class="finance-form-actions"><button type="button" class="finance-secondary" data-close-finance-modal>取消</button><button class="finance-primary" type="submit">保存分类</button></div>
     </form>`);
     modal.querySelector("form").addEventListener("submit", (event) => {
-      event.preventDefault(); const values = new FormData(event.currentTarget); const parent = categoryById(String(values.get("parentId") || "")); const direction = parent?.direction || "BOTH";
-      state.categories.push({ id: uid("category"), name: String(values.get("name")).trim(), direction, parentId: parent?.id || null, scope: "CUSTOM", ownerMemberId: "", sortOrder: state.categories.length + 1, isActive: true });
-      closeModal(modal); saveNow(); renderSettings(); showToast("二级分类已添加");
+      event.preventDefault();
+      const values = new FormData(event.currentTarget);
+      const parent = categoryById(String(values.get("parentId") || ""));
+      const fields = { name: String(values.get("name")).trim(), direction: parent?.direction || String(values.get("direction") || "BOTH"), parentId: parent?.id || null, isActive: true };
+      if (existing) {
+        Object.assign(existing, fields);
+        if (!existing.parentId) state.categories.filter((item) => item.parentId === existing.id).forEach((item) => { item.direction = existing.direction; });
+      } else {
+        state.categories.push({ id: uid("category"), ...fields, scope: "CUSTOM", ownerMemberId: "", sortOrder: state.categories.length + 1 });
+      }
+      closeModal(modal); saveNow(); renderSettings(); showToast(existing ? "分类已更新" : "分类已添加");
     });
+  }
+
+  function removeCategoryOption(categoryId) {
+    const category = categoryById(categoryId);
+    if (!category || !window.confirm(`停用分类“${category.name}”？历史账目仍会保留。`)) return;
+    category.isActive = false;
+    if (!category.parentId) state.categories.filter((item) => item.parentId === category.id).forEach((item) => { item.isActive = false; });
+    saveNow(); renderSettings(); showToast("分类已停用");
   }
 
   function openMemberModal(memberId) {
@@ -896,9 +941,33 @@
     await saveNow(); renderSettings(); showToast("成员已删除");
   }
 
-  function openTagModal() {
-    const modal = createModal("新增标签", `<form class="finance-form"><label class="is-wide"><span>标签名称</span><input name="tag" required maxlength="20" placeholder="例如：家庭公共"></label><div class="finance-form-actions"><button type="button" class="finance-secondary" data-close-finance-modal>取消</button><button class="finance-primary" type="submit">保存</button></div></form>`);
-    modal.querySelector("form").addEventListener("submit", (event) => { event.preventDefault(); const tag = String(new FormData(event.currentTarget).get("tag") || "").trim(); if (tag && !state.tags.includes(tag)) state.tags.push(tag); closeModal(modal); saveNow(); renderSettings(); });
+  function openTagModal(existingTag = "") {
+    const modal = createModal(existingTag ? "编辑标签" : "新增标签", `<form class="finance-form"><label class="is-wide"><span>标签名称</span><input name="tag" value="${escapeAttribute(existingTag)}" required maxlength="20" placeholder="例如：家庭公共"></label><div class="finance-form-actions"><button type="button" class="finance-secondary" data-close-finance-modal>取消</button><button class="finance-primary" type="submit">保存</button></div></form>`);
+    modal.querySelector("form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const tag = String(new FormData(event.currentTarget).get("tag") || "").trim();
+      if (tag && (!state.tags.includes(tag) || tag === existingTag)) {
+        if (existingTag) {
+          state.tags = state.tags.map((item) => item === existingTag ? tag : item);
+          state.transactions.forEach((item) => { if (item.tag === existingTag) item.tag = tag; });
+        } else state.tags.push(tag);
+      }
+      closeModal(modal); saveNow(); renderSettings();
+    });
+  }
+
+  function removeTagOption(tag) {
+    if (!window.confirm(`删除标签“${tag}”？历史账目中的标签文字会保留。`)) return;
+    state.tags = state.tags.filter((item) => item !== tag);
+    saveNow(); renderSettings(); showToast("标签已删除");
+  }
+
+  function archiveAccountOption(accountId) {
+    const account = accountById(accountId);
+    if (!account || !window.confirm(`停用账户“${cleanAccountDisplayName(account)}”？历史流水不会删除。`)) return;
+    account.isArchived = true;
+    account.updatedAt = new Date().toISOString();
+    saveNow(); renderSettings(); showToast("账户已停用");
   }
 
   function openAllocationRuleModal() {
@@ -981,7 +1050,6 @@
     const partner = partnerMember();
     const incomeRows = monthRows.filter((item) => ["INCOME", "REFUND", "REIMBURSEMENT"].includes(item.type));
     const ownerOf = (item) => item.ownerMemberId || item.payerMemberId || item.bookkeeperMemberId || "family";
-    const isOtherOwner = (ownerId) => ownerId !== me?.id && ownerId !== partner?.id;
     const incomeFor = (memberId) => sum(incomeRows.filter((item) => ownerOf(item) === memberId).map((item) => item.amountCents));
     const baibaiIncome = incomeFor(me?.id);
     const pangpangIncome = incomeFor(partner?.id);
@@ -992,7 +1060,7 @@
     const allocation = (rootId) => sum(allocationRows.filter((item) => topCategoryId(item.categoryId) === rootId).map((item) => item.amountCents));
     const familyTransfers = allocationRows.filter((item) => item.type === "TRANSFER" && accountById(item.toAccountId)?.ownerMemberId === "family");
     const distributionFor = (key) => {
-      const matches = (item) => key === "other" ? isOtherOwner(ownerOf(item)) : ownerOf(item) === key;
+      const matches = (item) => ownerOf(item) === key;
       const income = sum(incomeRows.filter(matches).map((item) => item.amountCents));
       const dream = sum(allocationRows.filter((item) => item.type === "TRANSFER" && topCategoryId(item.categoryId) === "category-dream" && matches(item)).map((item) => item.amountCents));
       const living = sum(allocationRows.filter((item) => item.type === "TRANSFER" && topCategoryId(item.categoryId) === "category-living" && matches(item)).map((item) => item.amountCents));
@@ -1001,7 +1069,7 @@
     };
     const whiteDistribution = distributionFor(me?.id);
     const partnerDistribution = distributionFor(partner?.id);
-    const otherDistribution = distributionFor("other");
+    const familyDistribution = distributionFor("family");
     const cashAccounts = state.accounts.filter((item) => !item.isArchived && item.includeInFamilyAssets && !["CREDIT_CARD", "SECURITIES", "VIRTUAL_POOL"].includes(item.type));
     const cashAssets = sum(cashAccounts.map((item) => item.currentBalanceCents));
     const investmentAssets = sum(investments.map((item) => item.totalAssetCents));
@@ -1019,7 +1087,7 @@
     const monthlyExpenseFor = (ownerId) => sum(monthRows.filter((item) => item.type === "EXPENSE" && ownerOf(item) === ownerId).map((item) => item.amountCents));
     const livingSurplusFor = (ownerId) => Math.max(0, Number(rule.livingBudgets?.[ownerId]) || 0) - livingSpentFor(ownerId);
     const spendingFor = (label, ownerId) => ({ label, expense: monthlyExpenseFor(ownerId), livingSurplus: livingSurplusFor(ownerId), accountSurplus: availableFor(ownerId) });
-    const monthlySpending = [spendingFor("白白", me?.id), spendingFor("胖胖", partner?.id), spendingFor("家庭", "family")];
+    const monthlySpending = [spendingFor("白白", me?.id), spendingFor("胖胖", partner?.id), spendingFor("家庭公共", "family")];
     const categoryBlueprints = [
       { label: "交通", icon: "🚇", keywords: ["交通", "通勤"] },
       { label: "外卖", icon: "🥡", keywords: ["外卖"] },
@@ -1045,7 +1113,7 @@
       pangpangAssets: { total: partnerCash + partnerInvestment, investment: partnerInvestment, cash: partnerCash },
       dreamShort, dreamLong, dreamTotal: dreamShort + dreamLong, monthlyDreamTransfer, monthlyDreamExpense,
       baibaiIncome, pangpangIncome, otherIncome: Math.max(0, monthIncome - baibaiIncome - pangpangIncome), monthIncome,
-      incomeDistribution: [{ label: "白白", ...whiteDistribution }, { label: "胖胖", ...partnerDistribution }, { label: "其他收入", ...otherDistribution }],
+      incomeDistribution: [{ label: "白白", ...whiteDistribution }, { label: "胖胖", ...partnerDistribution }, { label: "家庭公共", ...familyDistribution }],
       allocations: { fixed: allocation("category-fixed"), living: allocation("category-living"), flex: allocation("category-flex"), dream: allocation("category-dream"), investment: allocation("category-investment"), family: sum(familyTransfers.map((item) => item.amountCents)) },
       monthlySpending,
       moneyDestinations: {
@@ -1069,10 +1137,10 @@
   }
   function incomeDistributionTable(rows) {
     const cells = (item) => [["本月收入", item.income, "is-income"], ["划入Dream基金", item.dream, "is-dream"], ["划入个人生活费", item.living, "is-living"], ["划入家庭公共账户", item.family, "is-family"]];
-    return `<div class="overview-income-table"><div class="overview-income-head"><span>成员<button type="button" class="overview-inline-add" data-add-income aria-label="新增收入">＋</button></span><span class="is-income">本月收入</span><span class="is-dream">划入Dream基金</span><span class="is-living">划入个人生活费</span><span class="is-family">划入家庭公共账户</span></div>${rows.map((item) => `<div class="overview-income-row"><strong class="overview-income-member">${escapeHtml(item.label)}</strong>${cells(item).map(([label, value, className]) => `<div class="${className}"><small>${escapeHtml(label)}</small><strong>${money(value)}</strong></div>`).join("")}</div>`).join("")}</div>`;
+    return `<div class="overview-income-table"><div class="overview-income-head"><span>账户</span><span class="is-income">本月收入</span><span class="is-dream">划入Dream基金</span><span class="is-living">划入个人生活费</span><span class="is-family">划入家庭公共账户</span><span class="overview-table-action"><button type="button" class="overview-inline-add" data-add-income aria-label="新增收入">＋</button></span></div>${rows.map((item) => `<div class="overview-income-row"><strong class="overview-income-member">${escapeHtml(item.label)}</strong>${cells(item).map(([label, value, className]) => `<div class="${className}"><small>${escapeHtml(label)}</small><strong>${money(value)}</strong></div>`).join("")}<span class="overview-table-action"></span></div>`).join("")}</div>`;
   }
   function monthlySpendingGrid(rows) {
-    return `<div class="overview-spending-table"><div class="overview-spending-head"><span>成员<button type="button" class="overview-inline-add" data-add-expense aria-label="新增支出">＋</button></span><span>本月支出</span><span>本月生活余额</span><span>生活费账户总余额</span></div>${rows.map((item) => `<div class="overview-spending-row"><strong>${escapeHtml(item.label)}</strong><div class="is-expense"><strong>${money(item.expense)}</strong></div><div class="is-surplus"><strong>${money(item.livingSurplus)}</strong></div><div class="is-account-surplus"><strong>${money(item.accountSurplus)}</strong></div></div>`).join("")}</div>`;
+    return `<div class="overview-spending-table"><div class="overview-spending-head"><span>账户</span><span>本月支出</span><span>本月生活余额</span><span>生活费账户总余额</span><span class="overview-table-action"><button type="button" class="overview-inline-add" data-add-expense aria-label="新增支出">＋</button></span></div>${rows.map((item) => `<div class="overview-spending-row"><strong>${escapeHtml(item.label)}</strong><div class="is-expense"><strong>${money(item.expense)}</strong></div><div class="is-surplus"><strong>${money(item.livingSurplus)}</strong></div><div class="is-account-surplus"><strong>${money(item.accountSurplus)}</strong></div><span class="overview-table-action"></span></div>`).join("")}</div>`;
   }
   function destinationChartGroup(title, icon, rows, className) {
     const maxValue = Math.max(1, ...rows.map((item) => Number(item.value) || 0));
@@ -1097,16 +1165,18 @@
     };
     return [make("garden-pigeon", "PIGEON", "🕊️", "家庭鸽子", "家庭公共消费账户", "family"), make("garden-magpie", "MAGPIE", "🐦", "白白喜鹊", "白白生活支出账户", white?.id || ""), make("garden-pupa", "PUPA", "🐛", "胖胖蚕蛹", "胖胖生活支出账户", pang?.id || "")];
   }
-  function memberAccountSection(member, accounts, flows, unlocked, canAdd = unlocked) {
+  function memberAccountSection(member, accounts, flows, unlocked, canAdd = unlocked, compactFamily = false) {
     const total = accountGroupTotal(accounts);
-    return `<section class="finance-panel member-account-section ${unlocked ? "is-unlocked" : "is-locked"}"><div class="finance-panel-head"><div><strong>${escapeHtml(member.displayName)}账户</strong><br><span>${accounts.length} 个真实账户 · ${unlocked ? money(total) : "仅本人可见"}</span></div>${unlocked && canAdd ? `<button class="finance-primary" data-add-account="${escapeAttribute(member.id || "")}">＋ 账户</button>` : unlocked ? "" : `<span class="member-account-lock">🔒 无法展开</span>`}</div>${unlocked ? `<div class="member-account-table"><div class="member-account-head"><span>账户</span><span>余额</span><span>本月流入 / 流出</span><span>操作</span></div>${accounts.length ? accounts.map((account) => memberAccountRow(account, flows[account.id])).join("") : empty("还没有真实账户")}</div>` : `<div class="member-account-locked">请使用${escapeHtml(member.displayName)}的个人密码登录后查看。</div>`}</section>`;
+    const title = compactFamily ? "家庭公共" : `${member.displayName}账户`;
+    const subtitle = compactFamily ? "" : `<br><span>${accounts.length} 个真实账户 · ${unlocked ? money(total) : "仅本人可见"}</span>`;
+    return `<section class="finance-panel member-account-section ${unlocked ? "is-unlocked" : "is-locked"} ${compactFamily ? "is-compact-family" : ""}"><div class="finance-panel-head"><div><strong>${escapeHtml(title)}</strong>${subtitle}</div>${unlocked && canAdd ? `<button class="finance-primary" data-add-account="${escapeAttribute(member.id || "")}">＋ 账户</button>` : unlocked ? "" : `<span class="member-account-lock">🔒 无法展开</span>`}</div>${unlocked ? `<div class="member-account-table"><div class="member-account-head"><span>账户</span><span>余额</span><span>本月流入 / 流出</span><span>操作</span></div>${accounts.length ? accounts.map((account) => memberAccountRow(account, flows[account.id], compactFamily)).join("") : empty("还没有真实账户")}</div>` : `<div class="member-account-locked">请使用${escapeHtml(member.displayName)}的个人密码登录后查看。</div>`}</section>`;
   }
-  function memberAccountRow(account, flow = {}) {
+  function memberAccountRow(account, flow = {}, compactFamily = false) {
     const typeName = accountTypeName(account.type);
-    const displayName = cleanAccountDisplayName(account);
+    const displayName = compactFamily ? "银行卡" : cleanAccountDisplayName(account);
     const typeCaption = displayName === typeName ? "" : typeName;
     if (account.isExternalInvestment) return `<div class="member-account-row is-linked-investment"><div class="finance-account-name"><span class="finance-account-type">基</span><div><span>股票交易同步</span><strong>${escapeHtml(displayName)}</strong></div></div><strong>${money(account.currentBalanceCents)}</strong><span><small>数据来源</small>持仓与可用资金实时合计</span><div><button class="is-primary" data-open-investment-account>查看持仓</button></div></div>`;
-    return `<div class="member-account-row"><div class="finance-account-name"><span class="finance-account-type">${escapeHtml(accountIcon(account.type))}</span><div>${typeCaption ? `<span>${escapeHtml(typeCaption)}</span>` : ""}<strong>${escapeHtml(displayName)}</strong></div></div><strong>${money(account.currentBalanceCents)}</strong><span><small>本月流入 / 流出</small>${money(flow.incoming || 0)} / ${money(flow.outgoing || 0)}</span><div><button data-account-detail="${escapeAttribute(account.id)}">明细</button><button data-edit-account="${escapeAttribute(account.id)}">编辑</button><button class="is-primary" data-adjust-account="${escapeAttribute(account.id)}">＋金额</button></div></div>`;
+    return `<div class="member-account-row"><div class="finance-account-name"><span class="finance-account-type">${escapeHtml(accountIcon(account.type))}</span><div>${typeCaption && !compactFamily ? `<span>${escapeHtml(typeCaption)}</span>` : ""}<strong>${escapeHtml(displayName)}</strong></div></div><strong>${money(account.currentBalanceCents)}</strong><span><small>本月流入 / 流出</small>${money(flow.incoming || 0)} / ${money(flow.outgoing || 0)}</span><div><button data-account-detail="${escapeAttribute(account.id)}">明细</button><button data-edit-account="${escapeAttribute(account.id)}">编辑</button><button class="is-primary" data-adjust-account="${escapeAttribute(account.id)}">＋金额</button></div></div>`;
   }
   function dreamGarden(goals, accountAnimals = [], showHeader = true) {
     const weights = { GOOSE: 0, DUCK: 1, CHICKEN: 2, PIGEON: 3, MAGPIE: 4, PUPA: 5 };
@@ -1191,6 +1261,15 @@
   }
   function accountGroup(title, accounts, flows, ownerId) { return `<section class="finance-panel account-group"><div class="finance-panel-head"><div><strong>${escapeHtml(title)}</strong><br><span>${accounts.length} 个账户 · ${money(accountGroupTotal(accounts))}</span></div><button class="finance-secondary" data-member-account-detail="${escapeAttribute(ownerId || "")}">查看明细</button></div><div class="finance-account-list">${accounts.length ? accounts.map((account) => accountRow(account, flows[account.id], true)).join("") : empty("暂未添加账户")}</div></section>`; }
   function settingsMemberRow(member) { return `<div class="settings-row"><div><span>${escapeHtml(member.role)}</span><strong>${escapeHtml(member.displayName)}${member.isCurrentUser ? " · 当前" : ""}</strong><small>${member.includeInFamilyAssets !== false ? "计入家庭资产" : "不计家庭资产"} · ${member.participatesInFamilyLedger !== false ? "参与公共账本" : "不参与公共账本"}</small></div><div class="finance-inline-actions"><button class="finance-secondary" data-edit-member="${escapeAttribute(member.id)}">编辑</button>${member.isCurrentUser ? "" : `<button class="finance-secondary is-danger" data-delete-member="${escapeAttribute(member.id)}">删除</button>`}</div></div>`; }
+  function settingsCategoryGroup(root) {
+    const children = state.categories.filter((item) => item.parentId === root.id && item.isActive !== false);
+    const direction = root.direction === "INCOME" ? "收入" : root.direction === "EXPENSE" ? "支出" : "收支 / 转账";
+    return `<section class="settings-category-group"><div class="settings-category-root"><div><strong>${escapeHtml(root.name)}</strong><small>${direction}</small></div><div><button data-edit-category="${escapeAttribute(root.id)}">编辑</button><button data-remove-category="${escapeAttribute(root.id)}">×</button></div></div><div class="settings-category-children">${children.map((item) => `<span><b>${escapeHtml(item.name)}</b><button data-edit-category="${escapeAttribute(item.id)}">编辑</button><button data-remove-category="${escapeAttribute(item.id)}">×</button></span>`).join("") || `<small>暂无二级分类</small>`}</div></section>`;
+  }
+  function settingsAccountOptionRow(account) {
+    const displayName = account.ownerMemberId === "family" && account.id === "account-family" ? "银行卡" : cleanAccountDisplayName(account);
+    return `<div class="settings-account-row"><div><span>${escapeHtml(memberName(account.ownerMemberId))}</span><strong>${escapeHtml(displayName)}</strong><small>${escapeHtml(accountTypeName(account.type))} · ${money(account.currentBalanceCents)}</small></div><div><button class="finance-secondary" data-edit-account="${escapeAttribute(account.id)}">编辑</button><button class="finance-secondary is-danger" data-archive-account="${escapeAttribute(account.id)}">停用</button></div></div>`;
+  }
   function allocationRuleView(rule = {}) { const values = [["固定", rule.fixedBps], ["生活", rule.livingBps], ["机动", rule.flexBps], ["Dream", rule.dreamBps], ["投资", rule.investmentBps]]; return `<div class="allocation-rule">${values.map(([label, bps]) => `<div><span>${label}</span><strong>${((Number(bps) || 0) / 100).toFixed(0)}%</strong></div>`).join("")}</div>`; }
   function dreamFundSettlement(fund) { return Math.round((Number(fund.openingBalanceCents) + Number(fund.annualTransferCents) - Number(fund.annualExpenseCents)) * (1 + Number(fund.annualYieldBps || 0) / 10000)); }
   function dreamFundEarnings(fund) { return Number(fund.currentBalanceCents) - (Number(fund.openingBalanceCents) + Number(fund.annualTransferCents) - Number(fund.annualExpenseCents)); }
@@ -1533,7 +1612,10 @@
     const existingCategories = Array.isArray(raw.categories) ? raw.categories : [];
     const categoryMap = new Map(existingCategories.map((item) => [item.id, item]));
     const categories = [
-      ...categorySeedRows.map((seed) => ({ ...(categoryMap.get(seed.id) || {}), ...seed, isActive: true })),
+      ...categorySeedRows.map((seed) => {
+        const existing = categoryMap.get(seed.id);
+        return { ...seed, ...(existing || {}), id: seed.id, isActive: existing ? existing.isActive !== false : true };
+      }),
       ...existingCategories.filter((item) => !categorySeedIds.has(item.id)).map((item) => ({ ...item, isActive: item.scope === "CUSTOM" ? item.isActive !== false : false }))
     ];
     const existingAccounts = repairNames(Array.isArray(raw.accounts) ? raw.accounts : fallback.accounts, fallback.accounts);
@@ -1778,7 +1860,7 @@
   function escapeAttribute(value) { return escapeHtml(value).replace(/`/g, "&#096;"); }
 
   function optionList(options, selected) { return options.map(([value, label]) => `<option value="${escapeAttribute(value)}" ${value === selected ? "selected" : ""}>${escapeHtml(label)}</option>`).join(""); }
-  function accountOptions(selected) { return state.accounts.filter((item) => !item.isArchived).map((item) => `<option value="${escapeAttribute(item.id)}" ${item.id === selected ? "selected" : ""}>${escapeHtml(item.name)} · ${money(item.currentBalanceCents)}</option>`).join(""); }
+  function accountOptions(selected) { return state.accounts.filter((item) => !item.isArchived).map((item) => { const label = item.ownerMemberId === "family" && item.id === "account-family" ? "家庭公共 · 银行卡" : cleanAccountDisplayName(item); return `<option value="${escapeAttribute(item.id)}" ${item.id === selected ? "selected" : ""}>${escapeHtml(label)} · ${money(item.currentBalanceCents)}</option>`; }).join(""); }
   function memberOptions(selected) { return state.members.filter((item) => item.isActive).map((item) => `<option value="${escapeAttribute(item.id)}" ${item.id === selected ? "selected" : ""}>${escapeHtml(item.displayName)}</option>`).join(""); }
   function goalOptions(selected) { return state.goals.filter((item) => !item.isArchived).map((item) => `<option value="${escapeAttribute(item.id)}" ${item.id === selected ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join(""); }
   function categoryOptions(direction, selected) { return state.categories.filter((item) => [direction, "BOTH"].includes(item.direction) && item.isActive).map((item) => `<option value="${escapeAttribute(item.id)}" ${item.id === selected ? "selected" : ""}>${item.parentId ? "　" : ""}${escapeHtml(item.name)}</option>`).join(""); }
