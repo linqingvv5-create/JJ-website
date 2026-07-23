@@ -1558,7 +1558,7 @@
     return { allocated, earnings: Math.max(recordedEarnings, Math.max(0, Number(goal.earningsCents) || 0)), spent };
   }
   function animalPurpose(animal) {
-    const valid = (value) => { const text = String(value || "").trim(); return text && !/^[?？�\s]+$/.test(text) ? text : ""; };
+    const valid = (value) => { const text = String(value || "").trim(); return text && !/^[?？�\s,，.。!！:：;；、\-_/]+$/.test(text) ? text : ""; };
     const description = valid(animal.description) || valid(animal.note);
     if (!description) return "暂无说明";
     const type = ({ GOOSE: "退休", DUCK: "长期Dream", CHICKEN: "短期Dream", PIGEON: "家庭", MAGPIE: "白白生活", PUPA: "胖胖生活" })[animal.kind] || "Dream目标";
